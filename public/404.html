@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Botti Licita</title>
+    <!--
+      GitHub Pages não suporta rewrite de rotas no servidor, então toda URL
+      desconhecida (ex: /LicitaVMO/licitacoes/5) cai aqui. Este script
+      redireciona para a raiz do app codificando o caminho original numa
+      query string; o index.html decodifica e restaura a URL real via
+      history.replaceState, preservando o roteamento do React Router.
+      Técnica: https://github.com/rafgraph/spa-github-pages
+    -->
+    <script>
+      var pathSegmentsToKeep = 1
+      var l = window.location
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      )
+    </script>
+  </head>
+  <body></body>
+</html>

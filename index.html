@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Botti Licita</title>
+    <!-- Contraparte do public/404.html: decodifica o caminho original e
+         restaura a URL real antes do React Router montar. -->
+    <script>
+      (function () {
+        var search = window.location.search
+        if (search[1] === '/') {
+          var decoded = search.slice(1).split('&').map(function (s) {
+            return s.replace(/~and~/g, '&')
+          })
+          window.history.replaceState(
+            null, null,
+            window.location.pathname.slice(0, -1) + decoded[0] + (decoded.slice(1).length ? '?' + decoded.slice(1).join('&') : '') + window.location.hash
+          )
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
