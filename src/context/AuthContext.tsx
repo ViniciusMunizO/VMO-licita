@@ -7,6 +7,7 @@ type User = {
   name: string
   email: string
   role: 'admin' | 'moderador' | 'user'
+  ativo: boolean
 }
 
 type AuthContextValue = {
@@ -34,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       const profile = await getProfile(session.user.id, session.user.email || '')
       if (!mounted) return
-      const u: User = { id: session.user.id, name: profile.name, email: session.user.email || '', role: profile.role }
+      const u: User = { id: session.user.id, name: profile.name, email: session.user.email || '', role: profile.role, ativo: profile.ativo }
       localStorage.setItem('user_name', u.name)
       setUser(u)
     }
@@ -54,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error || !data.user) throw new Error('Login ou senha inválidos')
     const profile = await getProfile(data.user.id, data.user.email || '')
-    const u: User = { id: data.user.id, name: profile.name, email: data.user.email || '', role: profile.role }
+    const u: User = { id: data.user.id, name: profile.name, email: data.user.email || '', role: profile.role, ativo: profile.ativo }
     localStorage.setItem('user_name', u.name)
     setUser(u)
   }

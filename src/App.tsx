@@ -17,6 +17,22 @@ import Logo from './components/Logo'
 export default function App() {
   const { user, logout } = useAuth()
   const nav = useNavigate()
+
+  if (user && !user.ativo) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-800 flex items-center justify-center p-6">
+        <div className="bg-white p-8 rounded-lg shadow max-w-md text-center">
+          <Logo size="md" />
+          <h2 className="text-lg font-semibold mt-6 mb-2">Conta aguardando ativação</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Seu login foi criado, mas ainda não foi liberado pelo administrador do sistema. Fale com quem administra sua conta pra ativar o acesso.
+          </p>
+          <button onClick={() => { logout(); nav('/login') }} className="btn btn-ghost">Sair</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
       {user && (

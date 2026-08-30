@@ -19,8 +19,17 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   role text not null default 'user' check (role in ('admin','moderador','user')),
+  -- Nasce sempre `false`: um usuário só enxerga/mexe nos dados de negócio
+  -- depois que o admin ativa manualmente (dashboard ou SQL Editor). Isso é
+  -- defesa em profundidade — mesmo que o cadastro público do Supabase seja
+  -- religado por engano no futuro, uma conta nova sozinha não dá acesso a
+  -- nada, porque as políticas abaixo checam `ativo`, não só "autenticado".
+  ativo boolean not null default false,
   created_at timestamptz not null default now()
 );
+-- Migração para quem já tinha essa tabela sem a coluna (projeto provisionado
+-- antes dessa mudança): adiciona sem apagar nada.
+alter table profiles add column if not exists ativo boolean not null default false;
 
 -- ============================================================
 -- contratantes
@@ -168,8 +177,8 @@ create table if not exists audit_logs (
 
 -- ============================================================
 -- Row Level Security — como cada projeto Supabase é dedicado a um cliente
--- só, a regra é simples: quem está autenticado usa o sistema inteiro. Não
--- existe lógica de tenant/empresa aqui de propósito.
+-- só, a regra de base é simples: quem está autenticado E ativo usa o sistema
+-- inteiro. Não existe lógica de tenant/empresa aqui de propósito.
 -- ============================================================
 alter table profiles enable row level security;
 alter table contratantes enable row level security;
@@ -180,42 +189,96 @@ alter table attachments enable row level security;
 alter table atas enable row level security;
 alter table audit_logs enable row level security;
 
-create policy "autenticado le/grava profiles" on profiles for select using (auth.role() = 'authenticated');
-create policy "autenticado atualiza o proprio profile" on profiles for update using (auth.uid() = id);
+-- Função auxiliar: só quem tem profiles.ativo = true passa. SECURITY DEFINER
+-- pra não cair em recursão de RLS — ela lê `profiles` como dono da função
+-- (que não é afetado pelas próprias políticas da tabela), então pode ser
+-- usada dentro das políticas de `profiles` sem loop infinito.
+create or replace function public.membro_ativo()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select p.ativo from public.profiles p where p.id = auth.uid()), false);
+$$;
 
-create policy "autenticado tudo em contratantes" on contratantes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "autenticado tudo em empresa_info" on empresa_info for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "autenticado tudo em licitacoes" on licitacoes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "autenticado tudo em items" on items for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "autenticado tudo em attachments" on attachments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "autenticado tudo em atas" on atas for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "autenticado le/grava profiles" on profiles;
+drop policy if exists "usuario ve o proprio profile" on profiles;
+drop policy if exists "membro ativo ve todos os profiles" on profiles;
+drop policy if exists "autenticado atualiza o proprio profile" on profiles;
+-- Ver o próprio perfil não depende de já estar ativo (senão o app não
+-- consegue nem mostrar "sua conta ainda não foi liberada" depois do login).
+create policy "usuario ve o proprio profile" on profiles for select using (auth.uid() = id);
+-- Ver a lista de colegas (tela Usuários) já exige estar ativo.
+create policy "membro ativo ve todos os profiles" on profiles for select using (public.membro_ativo());
+-- Usuário pode editar o próprio nome, mas nunca a própria `role` nem o
+-- próprio `ativo` — o subselect aqui lê o valor já commitado (de antes desse
+-- update), então travar role/ativo ao valor atual impede autopromoção via
+-- API direta. Só o admin muda role/ativo de alguém, fora do app (dashboard
+-- ou SQL Editor).
+create policy "usuario atualiza o proprio profile" on profiles for update using (auth.uid() = id) with check (
+  auth.uid() = id
+  and role = (select p2.role from profiles p2 where p2.id = auth.uid())
+  and ativo = (select p2.ativo from profiles p2 where p2.id = auth.uid())
+);
 
--- audit_logs é só "for insert" + "for select restrito a admin" de propósito
--- (nunca "for all"): o app só precisa gravar e o admin ler — se qualquer
--- autenticado pudesse update/delete, a trilha de auditoria vira apagável por
--- quem ela audita, perdendo a função de registro confiável. Sem policy de
--- update/delete: RLS nega por padrão (ninguém altera/apaga, nem pela API).
-create policy "autenticado insere em audit_logs" on audit_logs for insert with check (auth.role() = 'authenticated');
+drop policy if exists "autenticado tudo em contratantes" on contratantes;
+drop policy if exists "membro ativo tudo em contratantes" on contratantes;
+create policy "membro ativo tudo em contratantes" on contratantes for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+drop policy if exists "autenticado tudo em empresa_info" on empresa_info;
+drop policy if exists "membro ativo tudo em empresa_info" on empresa_info;
+create policy "membro ativo tudo em empresa_info" on empresa_info for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+drop policy if exists "autenticado tudo em licitacoes" on licitacoes;
+drop policy if exists "membro ativo tudo em licitacoes" on licitacoes;
+create policy "membro ativo tudo em licitacoes" on licitacoes for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+drop policy if exists "autenticado tudo em items" on items;
+drop policy if exists "membro ativo tudo em items" on items;
+create policy "membro ativo tudo em items" on items for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+drop policy if exists "autenticado tudo em attachments" on attachments;
+drop policy if exists "membro ativo tudo em attachments" on attachments;
+create policy "membro ativo tudo em attachments" on attachments for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+drop policy if exists "autenticado tudo em atas" on atas;
+drop policy if exists "membro ativo tudo em atas" on atas;
+create policy "membro ativo tudo em atas" on atas for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+-- audit_logs é só "for insert" + "for select restrito a admin ativo" de
+-- propósito (nunca "for all"): o app só precisa gravar e o admin ler — se
+-- qualquer autenticado pudesse update/delete, a trilha de auditoria vira
+-- apagável por quem ela audita, perdendo a função de registro confiável. Sem
+-- policy de update/delete: RLS nega por padrão (ninguém altera/apaga, nem
+-- pela API).
+drop policy if exists "autenticado tudo em audit_logs" on audit_logs;
+drop policy if exists "autenticado insere em audit_logs" on audit_logs;
+drop policy if exists "membro ativo insere em audit_logs" on audit_logs;
+drop policy if exists "admin le audit_logs" on audit_logs;
+create policy "membro ativo insere em audit_logs" on audit_logs for insert with check (public.membro_ativo());
 create policy "admin le audit_logs" on audit_logs for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
 );
 
 -- ============================================================
 -- Cria o profile automaticamente quando um usuário novo é criado pelo painel
 -- do Supabase (Authentication -> Add user) — sem isso, ele logaria sem nome
 -- nem papel definidos. Nome vem de user_metadata.name se informado no
--- cadastro; papel sempre nasce como 'user' (o admin promove depois, se for
--- o caso, editando a linha em profiles).
+-- cadastro; papel sempre nasce como 'user' e ativo sempre nasce como `false`
+-- (o admin promove/ativa depois, editando a linha em profiles).
 -- ============================================================
-create function public.handle_new_user()
+create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, name, role)
-  values (new.id, coalesce(new.raw_user_meta_data->>'name', new.email), 'user');
+  insert into public.profiles (id, name, role, ativo)
+  values (new.id, coalesce(new.raw_user_meta_data->>'name', new.email), 'user', false);
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = '';
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
