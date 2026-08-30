@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { dbGet } from '../utils/db'
+import { listAuditLogs } from '../utils/audit'
 import { formatEpochBR } from '../utils/date'
 
 export default function AdminAudit() {
@@ -7,14 +7,7 @@ export default function AdminAudit() {
 
   useEffect(() => {
     let mounted = true
-    const load = async () => {
-      await import('../utils/db').then(m => m.migrateFromLocalStorage())
-      const { dbGet } = await import('../utils/db')
-      const raw = (await dbGet('audit_logs')) || (localStorage.getItem('audit_logs') ? JSON.parse(localStorage.getItem('audit_logs') || '[]') : [])
-      if (!mounted) return
-      setLogs(raw.reverse())
-    }
-    void load()
+    listAuditLogs().then(raw => { if (mounted) setLogs(raw) })
     return () => { mounted = false }
   }, [])
 

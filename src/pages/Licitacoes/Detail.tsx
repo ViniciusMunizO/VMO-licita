@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { dbGet } from '../../utils/db'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { formatDateTimeBR, formatDateBR } from '../../utils/date'
 import { formatNumeric, calcCustoUnitario, calcTotalCusto } from '../../utils/format'
@@ -11,11 +10,17 @@ import DeclaracoesSection from '../../components/DeclaracoesSection'
 import PrintableChecklist from '../../components/PrintableChecklist'
 import PrintableProposta from '../../components/PrintableProposta'
 import { setLancadoNoKralen } from '../../utils/kralen'
+import { getLicitacao } from '../../utils/licitacoes'
+import { listItems, updateItem } from '../../utils/items'
+import { listAttachments } from '../../utils/attachments'
+import { listAtas, addAta, removeAta as removeAtaApi } from '../../utils/atas'
+import { getEmpresaInfo } from '../../utils/empresa'
+import { auditLog } from '../../utils/audit'
 
 // Limite de caracteres do motivo de desclassificação — grande o suficiente
 // pra uma explicação de verdade (o exemplo real do cliente tem ~140
 // caracteres), mas evita que um texto absurdamente longo pese na gravação
-// no IndexedDB, estoure a célula da tabela nos relatórios ou infle o PDF.
+// no banco, estoure a célula da tabela nos relatórios ou infle o PDF.
 const MOTIVO_MAX_LENGTH = 500
 
 const HABILITACAO_ITEMS: { key: string; label: string }[] = [
@@ -76,21 +81,17 @@ export default function DetailLicitacao() {
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      const { dbGet, migrateFromLocalStorage } = await import('../../utils/db')
-      // Garante que qualquer dado antigo ainda só em localStorage (de antes da
-      // migração para IndexedDB) seja copiado pro banco antes de ler — assim
-      // a leitura abaixo sempre reflete o banco, nunca depende de fallback.
-      await migrateFromLocalStorage()
-      const list = (await dbGet('licitacoes')) || []
-      const found = list.find((x: any) => String(x.codigo) === String(codigo))
+      const found = await getLicitacao(codigo!)
       if (!mounted) return
       setModel(found || null)
       // load attachments, items and atas/contratos
       try {
-        const rawAt = (await dbGet(`attachments_${codigo}`)) || []
-        const rawIt = (await dbGet(`items_${codigo}`)) || []
-        const rawAtas = (await dbGet(`atas_${codigo}`)) || []
-        const rawEmpresa = (await dbGet('empresa_info')) || null
+        const [rawAt, rawIt, rawAtas, rawEmpresa] = await Promise.all([
+          listAttachments(codigo!),
+          listItems(codigo!),
+          listAtas(codigo!),
+          getEmpresaInfo(),
+        ])
         if (mounted) {
           setAttachments(rawAt)
           setItems(rawIt)
@@ -110,21 +111,16 @@ export default function DetailLicitacao() {
   const [showAtaModal, setShowAtaModal] = useState(false)
 
   const saveAta = async (ata: Ata) => {
-    const key = `atas_${codigo}`
-    const { dbUpdate } = await import('../../utils/db')
-    const updated = await dbUpdate<Ata[]>(key, (current) => [...(current || []), ata])
+    const updated = await addAta(codigo!, ata)
     setAtas(updated)
     try {
-      const { auditLog } = await import('../../utils/audit')
       const auditUser = localStorage.getItem('user_name') || undefined
       await auditLog('ata_create', { codigo, tipo: ata.tipo, numero: ata.numero }, auditUser)
     } catch (err) { /* ignore */ }
   }
 
   const removeAta = async (id: string) => {
-    const key = `atas_${codigo}`
-    const { dbUpdate } = await import('../../utils/db')
-    const list = await dbUpdate<Ata[]>(key, (current) => (current || []).filter((a: Ata) => a.id !== id))
+    const list = await removeAtaApi(id, codigo!)
     setAtas(list)
   }
   const toggleKralen = async (checked: boolean) => {
@@ -140,20 +136,14 @@ export default function DetailLicitacao() {
   const [editingValorGanhoIdx, setEditingValorGanhoIdx] = useState<number | null>(null)
 
   const saveValorGanho = async (idx: number, valor: string) => {
-    const key = `items_${model.codigo}`
-    const { dbUpdate } = await import('../../utils/db')
-    const list = await dbUpdate<any[]>(key, (current) => {
-      const next = [...(current || [])]
-      next[idx] = { ...(next[idx] || {}), valorGanho: valor }
-      return next
-    })
+    const atualizado = await updateItem(items[idx].id, { valorGanho: valor })
+    const list = [...items]; list[idx] = atualizado
     setItems(list)
     setValorGanhoDraft(d => { const next = { ...d }; delete next[idx]; return next })
     // sai do modo de edição — o valor salvo aparece como texto fixo, o que
     // deixa claro pra quem usa que o "OK" realmente gravou algo.
     setEditingValorGanhoIdx(current => (current === idx ? null : current))
     try {
-      const { auditLog } = await import('../../utils/audit')
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('item_valor_ganho', { codigo: model.codigo, itemIndex: idx, valorGanho: valor, descricao: list[idx].descricao }, user)
     } catch (err) { /* ignore */ }
@@ -165,47 +155,30 @@ export default function DetailLicitacao() {
   // Desclassificar e Vencedor são mutuamente exclusivos — um item desclassificado
   // nunca chegou a disputar, então marcar um limpa o outro.
   const marcarDesclassificado = async (idx: number) => {
-    const key = `items_${model.codigo}`
-    const { dbUpdate } = await import('../../utils/db')
-    const list = await dbUpdate<any[]>(key, (current) => {
-      const next = [...(current || [])]
-      next[idx] = { ...(next[idx] || {}), desclassificado: true, vencedor: false }
-      return next
-    })
+    const atualizado = await updateItem(items[idx].id, { desclassificado: true, vencedor: false })
+    const list = [...items]; list[idx] = atualizado
     setItems(list)
     setEditingMotivoIdx(idx)
     try {
-      const { auditLog } = await import('../../utils/audit')
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('item_desclassificar', { codigo: model.codigo, itemIndex: idx, descricao: list[idx].descricao }, user)
     } catch (err) { /* ignore */ }
   }
 
   const reverterDesclassificacao = async (idx: number) => {
-    const key = `items_${model.codigo}`
-    const { dbUpdate } = await import('../../utils/db')
-    const list = await dbUpdate<any[]>(key, (current) => {
-      const next = [...(current || [])]
-      next[idx] = { ...(next[idx] || {}), desclassificado: false }
-      return next
-    })
+    const atualizado = await updateItem(items[idx].id, { desclassificado: false })
+    const list = [...items]; list[idx] = atualizado
     setItems(list)
   }
 
   const saveMotivo = async (idx: number, motivo: string) => {
-    const key = `items_${model.codigo}`
     const motivoLimitado = motivo.slice(0, MOTIVO_MAX_LENGTH)
-    const { dbUpdate } = await import('../../utils/db')
-    const list = await dbUpdate<any[]>(key, (current) => {
-      const next = [...(current || [])]
-      next[idx] = { ...(next[idx] || {}), motivoDesclassificacao: motivoLimitado }
-      return next
-    })
+    const atualizado = await updateItem(items[idx].id, { motivoDesclassificacao: motivoLimitado })
+    const list = [...items]; list[idx] = atualizado
     setItems(list)
     setMotivoDraft(d => { const next = { ...d }; delete next[idx]; return next })
     setEditingMotivoIdx(current => (current === idx ? null : current))
     try {
-      const { auditLog } = await import('../../utils/audit')
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('item_motivo_desclassificacao', { codigo: model.codigo, itemIndex: idx, motivo: motivoLimitado, descricao: list[idx].descricao }, user)
     } catch (err) { /* ignore */ }
@@ -222,18 +195,12 @@ export default function DetailLicitacao() {
   }
 
   const saveEditItem = async (idx: number) => {
-    const key = `items_${model.codigo}`
-    const { dbUpdate } = await import('../../utils/db')
-    const list = await dbUpdate<any[]>(key, (current) => {
-      const next = [...(current || [])]
-      next[idx] = { ...(next[idx] || {}), ...editItemDraft }
-      return next
-    })
+    const atualizado = await updateItem(items[idx].id, editItemDraft)
+    const list = [...items]; list[idx] = atualizado
     setItems(list)
     setEditingItemIndex(null)
     setEditItemDraft(null)
     try {
-      const { auditLog } = await import('../../utils/audit')
       const auditUser = localStorage.getItem('user_name') || undefined
       await auditLog('item_edit', { codigo: model.codigo, itemIndex: idx, descricao: list[idx].descricao }, auditUser)
     } catch (err) { /* ignore */ }
@@ -490,16 +457,10 @@ export default function DetailLicitacao() {
                               <span className="inline-flex items-center gap-1 text-xs font-semibold text-white px-2 py-1 rounded-full" style={{ backgroundColor: '#15803d' }}>✓ Vencedor</span>
                               <button
                                 onClick={async () => {
-                                  const key = `items_${model.codigo}`
-                                  const { dbUpdate } = await import('../../utils/db')
-                                  const list = await dbUpdate<any[]>(key, (current) => {
-                                    const next = [...(current || [])]
-                                    next[idx] = { ...(next[idx] || {}), vencedor: false }
-                                    return next
-                                  })
+                                  const atualizado = await updateItem(items[idx].id, { vencedor: false })
+                                  const list = [...items]; list[idx] = atualizado
                                   setItems(list)
                                   try {
-                                    const { auditLog } = await import('../../utils/audit')
                                     const user = localStorage.getItem('user_name') || undefined
                                     await auditLog('item_mark_winner', { codigo: model.codigo, itemIndex: idx, vencedor: false, descricao: list[idx].descricao }, user)
                                   } catch (err) { /* ignore */ }
@@ -513,17 +474,11 @@ export default function DetailLicitacao() {
                             <div className="flex gap-2">
                               <button
                                 onClick={async () => {
-                                  const key = `items_${model.codigo}`
-                                  const { dbUpdate } = await import('../../utils/db')
-                                  const list = await dbUpdate<any[]>(key, (current) => {
-                                    const next = [...(current || [])]
-                                    next[idx] = { ...(next[idx] || {}), vencedor: true }
-                                    return next
-                                  })
+                                  const atualizado = await updateItem(items[idx].id, { vencedor: true })
+                                  const list = [...items]; list[idx] = atualizado
                                   setItems(list)
                                   setEditingValorGanhoIdx(idx)
                                   try {
-                                    const { auditLog } = await import('../../utils/audit')
                                     const user = localStorage.getItem('user_name') || undefined
                                     await auditLog('item_mark_winner', { codigo: model.codigo, itemIndex: idx, vencedor: true, descricao: list[idx].descricao }, user)
                                   } catch (err) { /* ignore */ }
@@ -706,7 +661,6 @@ export default function DetailLicitacao() {
           if (!propostaRef.current) return
           await exportElementsToPdf([propostaRef.current], `proposta_${model.codigo}.pdf`, 'Proposta de Preços')
           try {
-            const { auditLog } = await import('../../utils/audit')
             const userName = localStorage.getItem('user_name') || undefined
             await auditLog('proposta_emitida', { codigo: model.codigo }, userName)
           } catch (err) { /* ignore */ }
@@ -722,8 +676,7 @@ export default function DetailLicitacao() {
       <AttachmentsModal open={openAttachments} onClose={async () => {
         setOpenAttachments(false)
         try {
-          const { dbGet } = await import('../../utils/db')
-          const rawAt = (await dbGet(`attachments_${model.codigo}`)) || []
+          const rawAt = await listAttachments(model.codigo)
           setAttachments(rawAt)
         } catch (err) { /* ignore */ }
       }} codigo={Number(model.codigo)} />

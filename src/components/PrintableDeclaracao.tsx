@@ -16,8 +16,8 @@ export default function PrintableDeclaracao({ titulo, corpo, ctx, pageRef }: Pro
 
   return (
     <div ref={pageRef} style={{ width: '794px', padding: 32, background: '#fff', color: '#000', boxSizing: 'border-box', fontFamily: 'Arial, sans-serif', fontSize: 12, lineHeight: 1.5 }}>
-      <header style={{ marginBottom: 12, borderBottom: '2px solid #2C2D7D', paddingBottom: 8 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#2C2D7D' }}>{ctx.razaoSocial || 'Empresa'}</div>
+      <header style={{ marginBottom: 12, borderBottom: '2px solid #0F1B3D', paddingBottom: 8 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0F1B3D' }}>{ctx.razaoSocial || 'Empresa'}</div>
         <div style={{ fontSize: 11, color: '#444' }}>CNPJ: {ctx.cnpj || '-'}{ctx.inscricaoEstadual ? ` — I.E.: ${ctx.inscricaoEstadual}` : ''}</div>
         <div style={{ fontSize: 11, color: '#444' }}>{ctx.endereco || '-'}{ctx.cidade ? ` — ${ctx.cidade}` : ''}{ctx.uf ? `/${ctx.uf}` : ''}{ctx.cep ? ` — CEP ${ctx.cep}` : ''}</div>
         {ctx.telefone && <div style={{ fontSize: 11, color: '#444' }}>Tel: {ctx.telefone}</div>}

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { listAttachments, addAttachment, removeAttachment } from '../utils/attachments'
+import { auditLog } from '../utils/audit'
 
 type Attachment = {
   id: string
@@ -9,18 +11,12 @@ type Attachment = {
 }
 
 export default function AttachmentsModal({ open, onClose, codigo }: { open: boolean; onClose: () => void; codigo: number }) {
-  const key = `attachments_${codigo}`
   const [list, setList] = useState<Attachment[]>([])
   const [name, setName] = useState('')
 
   useEffect(() => {
     let mounted = true
-    import('../utils/db').then(async db => {
-      await db.migrateFromLocalStorage()
-      const raw = await db.dbGet(key)
-      if (!mounted) return
-      setList(raw || [])
-    })
+    listAttachments(codigo).then(raw => { if (mounted) setList(raw || []) })
     return () => { mounted = false }
   }, [open, codigo])
 
@@ -29,17 +25,8 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
     const reader = new FileReader()
     reader.onload = async () => {
       const data = String(reader.result)
-      const att: Attachment = {
-        id: String(Date.now()) + Math.random().toString(36).slice(2, 8),
-        name: name || f.name,
-        filename: f.name,
-        data,
-        date: new Date().toISOString(),
-      }
-      const db = await import('../utils/db')
-      // Anexa ao valor mais atual do banco (não ao estado local, que pode
-      // estar desatualizado se outra aba mexeu nos anexos nesse meio-tempo).
-      const updated = await db.dbUpdate<Attachment[]>(key, (current) => [...(current || []), att])
+      const att = { name: name || f.name, filename: f.name, data }
+      const updated = await addAttachment(codigo, att)
       setList(updated)
       setName('')
       void recordUpload(att)
@@ -48,16 +35,14 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
   }
 
   const remove = async (id: string) => {
-    const db = await import('../utils/db')
-    const updated = await db.dbUpdate<Attachment[]>(key, (current) => (current || []).filter(l => l.id !== id))
+    const updated = await removeAttachment(id, codigo)
     setList(updated)
     void recordRemove(id)
   }
 
   // audit attachments
-  const recordUpload = async (att: Attachment) => {
+  const recordUpload = async (att: { name: string; filename: string }) => {
     try {
-      const { auditLog } = await import('../utils/audit')
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('attachment_upload', { codigo, name: att.name, filename: att.filename }, user)
     } catch (err) { /* ignore */ }
@@ -65,7 +50,6 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
 
   const recordRemove = async (attId: string) => {
     try {
-      const { auditLog } = await import('../utils/audit')
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('attachment_remove', { codigo, id: attId }, user)
     } catch (err) { /* ignore */ }

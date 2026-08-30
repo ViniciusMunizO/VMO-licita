@@ -6,6 +6,9 @@ import AttachmentsModal from '../../components/AttachmentsModal'
 import ItemsImportModal from '../../components/ItemsImportModal'
 import { nowInBrasilia } from '../../utils/date'
 import { DateInputBR, TimeInputBR } from '../../components/DateTimeBR'
+import { listContratantes } from '../../utils/contratantes'
+import { getLicitacao, createLicitacao, updateLicitacao, previewNextCodigo } from '../../utils/licitacoes'
+import { auditLog } from '../../utils/audit'
 
 type Licitacao = {
   codigo: number
@@ -31,23 +34,6 @@ type Licitacao = {
   vigenciaContrato?: string
   habilitacao?: any
   [key: string]: any
-}
-
-// Deriva o próximo código a partir do maior código já existente na lista de
-// licitações, em vez de um contador solto em localStorage — um contador
-// desacoplado dos dados reais pode ficar dessincronizado (ex: dados
-// removidos/editados manualmente) e gerar um código já usado por outra
-// licitação, o que corrompe dados (itens/anexos/atas são guardados em
-// chaves como `items_${codigo}`, então uma colisão faz duas licitações
-// dividirem os mesmos itens/anexos). Usado só como prévia ao carregar a
-// página — o código que realmente vale é recalculado dentro da transação
-// atômica no momento de salvar (ver `save`), pra não colidir se outra aba
-// tiver salvo uma licitação nova nesse meio-tempo.
-async function nextCodigo(): Promise<number> {
-  const { dbGet } = await import('../../utils/db')
-  const list = (await dbGet('licitacoes')) || []
-  const max = list.reduce((m: number, l: any) => Math.max(m, Number(l.codigo) || 0), 0)
-  return max + 1
 }
 
 export default function FormLicitacao() {
@@ -81,18 +67,14 @@ export default function FormLicitacao() {
     const init = async () => {
       const params = new URLSearchParams(location.search)
       const edit = params.get('edit')
-      await import('../../utils/db').then(m => m.migrateFromLocalStorage())
       // load contratantes
       try {
-        const { dbGet } = await import('../../utils/db')
-        const cs = (await dbGet('contratantes')) || []
+        const cs = await listContratantes()
         if (mounted) setContratantes(cs)
       } catch (err) { /* ignore */ }
       if (!mounted) return
       if (edit) {
-        const { dbGet } = await import('../../utils/db')
-        const list = (await dbGet('licitacoes')) || []
-        const found = list.find((x: any) => String(x.codigo) === String(edit))
+        const found = await getLicitacao(edit)
         if (found) {
           setModelo(found)
           setHabilitacao(found.habilitacao || ({} as any))
@@ -101,7 +83,7 @@ export default function FormLicitacao() {
         }
       }
       const { date, time } = nowInBrasilia()
-      const codigo = await nextCodigo()
+      const codigo = await previewNextCodigo()
       if (!mounted) return
       setModelo(m => ({ ...m, codigo, dataCredenciamento: date, horaCredenciamento: time }))
     }
@@ -113,28 +95,14 @@ export default function FormLicitacao() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { dbUpdate } = await import('../../utils/db')
-    let savedCodigo = modelo.codigo
-    // Lê e grava a lista de licitações numa única transação atômica (ver
-    // dbUpdate em utils/db.ts) — evita que duas abas/usuários salvando ao
-    // mesmo tempo se sobrescrevam (last-write-wins) ou colidam no código.
-    await dbUpdate<any[]>('licitacoes', (current) => {
-      const list = current || []
-      const record: any = { ...modelo, criadoPor: user?.name, contratante: selectedContratante || { nome: modelo.contratado }, habilitacao }
-      if (isEditing) {
-        const idx = list.findIndex((x: any) => String(x.codigo) === String(modelo.codigo))
-        if (idx >= 0) { const next = [...list]; next[idx] = record; return next }
-        return [...list, record]
-      }
-      const max = list.reduce((m: number, l: any) => Math.max(m, Number(l.codigo) || 0), 0)
-      savedCodigo = max + 1
-      record.codigo = savedCodigo
-      return [...list, record]
-    })
+    const record: any = { ...modelo, criadoPor: user?.name, contratante: selectedContratante || { nome: modelo.contratado }, habilitacao }
+    // O código final quem define é a coluna identity do Postgres (nunca
+    // colide, mesmo com dois cadastros simultâneos) — o `codigo` calculado
+    // em memória (previewNextCodigo) era só uma prévia pra exibir na tela.
+    const saved = isEditing ? await updateLicitacao(modelo.codigo, record) : await createLicitacao(record)
     try {
-      const { auditLog } = await import('../../utils/audit')
       const userName = localStorage.getItem('user_name') || undefined
-      await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: savedCodigo }, userName)
+      await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: saved.codigo }, userName)
     } catch (err) { /* ignore */ }
     nav('/licitacoes')
   }
@@ -349,8 +317,7 @@ export default function FormLicitacao() {
       <ContractorModal open={showContractorModal} onClose={async () => {
         setShowContractorModal(false)
         try {
-          const { dbGet } = await import('../../utils/db')
-          const cs = (await dbGet('contratantes')) || []
+          const cs = await listContratantes()
           setContratantes(cs)
         } catch (err) { /* ignore */ }
       }} onSelect={(c) => { setSelectedContratante(c); setModelo(m => ({ ...m, contratado: c.nome })) }} />

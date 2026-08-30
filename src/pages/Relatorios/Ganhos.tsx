@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { dbGet, migrateFromLocalStorage } from '../../utils/db'
+import { listLicitacoes } from '../../utils/licitacoes'
+import { listItems } from '../../utils/items'
 import { formatDateTimeBR, splitLegacyDateTime, nowInBrasilia, addMonthsToDate } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed } from '../../utils/format'
@@ -92,11 +93,10 @@ export default function RelatorioGanhos() {
   const hoje = nowInBrasilia().date
 
   const load = async () => {
-    await migrateFromLocalStorage()
-    const list = (await dbGet('licitacoes')) || []
+    const list = await listLicitacoes()
     setLicitacoes(list)
     const entries = await Promise.all(list.map(async (l: any) => {
-      const items = (await dbGet(`items_${l.codigo}`)) || []
+      const items = await listItems(l.codigo)
       return [String(l.codigo), items] as const
     }))
     setItemsByCodigo(Object.fromEntries(entries))

@@ -7,9 +7,11 @@ html, body, #root {
 }
 
 :root {
-  --color-primary: #2C2D7D;
-  --color-secondary: #5f60af;
-  --color-error: #F22F3C;
+  /* Identidade visual Botti Global Pharma: navy + vermelho */
+  --color-primary: #0F1B3D;
+  --color-secondary: #28345C;
+  --color-accent: #EF4136;
+  --color-error: #EF4136;
 }
 
 /* Base typography and layout polish */

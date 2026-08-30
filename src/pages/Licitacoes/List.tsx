@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { dbGet, migrateFromLocalStorage } from '../../utils/db'
+import { listLicitacoes } from '../../utils/licitacoes'
+import { listItems } from '../../utils/items'
+import { listAtas } from '../../utils/atas'
 import { formatDateTimeBR } from '../../utils/date'
 
 export default function ListLicitacoes() {
@@ -13,20 +15,19 @@ export default function ListLicitacoes() {
 
   useEffect(() => {
     let mounted = true
-    migrateFromLocalStorage().then(async () => {
-      const raw = await dbGet('licitacoes')
+    listLicitacoes().then(async (raw) => {
       if (!mounted) return
       const items: any[] = raw || []
       setList(items)
       const entries = await Promise.all(items.map(async (l) => {
-        const atas = await dbGet(`atas_${l.codigo}`)
+        const atas = await listAtas(l.codigo)
         return [String(l.codigo), Array.isArray(atas) && atas.length > 0] as const
       }))
       if (!mounted) return
       setHasAtaByCodigo(Object.fromEntries(entries))
 
       const itemsEntries = await Promise.all(items.map(async (l) => {
-        const its = await dbGet(`items_${l.codigo}`)
+        const its = await listItems(l.codigo)
         const text = Array.isArray(its) ? its.map((it: any) => JSON.stringify(it)).join(' ') : ''
         return [String(l.codigo), text] as const
       }))

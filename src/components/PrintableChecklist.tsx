@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { dbGet } from '../utils/db'
+import { getEmpresaInfo } from '../utils/empresa'
+import { listItems } from '../utils/items'
+import { listAttachments } from '../utils/attachments'
 import { formatDateTimeBR } from '../utils/date'
 import { formatNumeric, formatAnvisa } from '../utils/format'
 import { agruparPorLote, somaColuna } from '../utils/itens'
@@ -19,7 +21,7 @@ type Props = {
   attachments?: any[]
 }
 
-const PRIMARY = '#2C2D7D'
+const PRIMARY = '#0F1B3D'
 const BOX_BG = '#f6f6fb'
 const BOX_BORDER = '#e4e4f0'
 
@@ -156,12 +158,12 @@ export default function PrintableChecklist({ modelo, codigo, user, habilitacao =
 
   useEffect(() => {
     let mounted = true
-    dbGet('empresa_info').then(emp => { if (mounted) setEmpresa(emp || null) })
+    getEmpresaInfo().then(emp => { if (mounted) setEmpresa(emp || null) })
     if (itemsProp === undefined) {
-      dbGet(`items_${codigo}`).then(it => { if (mounted) setFetchedItems(it || []) })
+      listItems(codigo).then(it => { if (mounted) setFetchedItems(it || []) })
     }
     if (attachmentsProp === undefined) {
-      dbGet(`attachments_${codigo}`).then(at => { if (mounted) setFetchedAttachments(at || []) })
+      listAttachments(codigo).then(at => { if (mounted) setFetchedAttachments(at || []) })
     }
     return () => { mounted = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps

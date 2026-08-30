@@ -1,4 +1,4 @@
-import { dbGet, dbSet } from './db'
+import { supabase } from './supabaseClient'
 
 export type AuditEntry = {
   id: string
@@ -8,20 +8,16 @@ export type AuditEntry = {
   payload?: any
 }
 
-const STORE_KEY = 'audit_logs'
-
 export async function auditLog(action: string, payload?: any, user?: string) {
   try {
-    const list = (await dbGet(STORE_KEY)) || []
-    const entry: AuditEntry = { id: String(Date.now()) + Math.random().toString(36).slice(2, 8), at: Date.now(), user, action, payload }
-    list.push(entry)
-    await dbSet(STORE_KEY, list)
+    await supabase.from('audit_logs').insert({ at: Date.now(), user, action, payload })
   } catch (err) {
-    // fallback to localStorage
-    const raw = localStorage.getItem(STORE_KEY)
-    const list = raw ? JSON.parse(raw) : []
-    const entry: AuditEntry = { id: String(Date.now()) + Math.random().toString(36).slice(2, 8), at: Date.now(), user, action, payload }
-    list.push(entry)
-    localStorage.setItem(STORE_KEY, JSON.stringify(list))
+    // Log de auditoria nunca deve travar a ação principal do usuário.
   }
+}
+
+export async function listAuditLogs(): Promise<AuditEntry[]> {
+  const { data, error } = await supabase.from('audit_logs').select('*').order('at', { ascending: false })
+  if (error) throw error
+  return data || []
 }

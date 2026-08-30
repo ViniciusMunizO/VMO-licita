@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { listContratantes, addContratante } from '../utils/contratantes'
 
 type Contratante = {
   codigo: string
@@ -12,28 +13,13 @@ export default function ContractorModal({ open, onClose, onSelect }: { open: boo
 
   useEffect(() => {
     let mounted = true
-    import('../utils/db').then(async db => {
-      await db.migrateFromLocalStorage()
-      const raw = await db.dbGet('contratantes')
-      if (!mounted) return
-      setList(raw || [])
-    })
+    listContratantes().then(raw => { if (mounted) setList(raw || []) })
     return () => { mounted = false }
   }, [open])
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { dbUpdate } = await import('../utils/db')
-    // Código e gravação calculados dentro de uma única transação atômica —
-    // evita colisão de código e perda de cadastro quando duas pessoas
-    // registram um contratante ao mesmo tempo (mesmo problema já corrigido
-    // no código das licitações).
-    const updated = await dbUpdate<Contratante[]>('contratantes', (current) => {
-      const atual = current || []
-      const max = atual.reduce((m, c) => Math.max(m, Number(c.codigo) || 0), 0)
-      const novo: Contratante = { codigo: String(max + 1).padStart(4, '0'), nome: form.nome || '', uf: (form.uf || '').toUpperCase() }
-      return [...atual, novo]
-    })
+    const updated = await addContratante(form.nome || '', form.uf || '')
     setList(updated)
     setForm({ nome: '', uf: '' })
   }

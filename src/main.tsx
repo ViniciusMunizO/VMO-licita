@@ -4,11 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/index.css'
 import { AuthProvider } from './context/AuthContext'
-import { primeDB } from './utils/db'
-import { ensureDefaultAdmin } from './utils/auth'
-
-primeDB()
-ensureDefaultAdmin()
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

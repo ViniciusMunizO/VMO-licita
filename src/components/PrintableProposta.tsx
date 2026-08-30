@@ -14,7 +14,7 @@ type Props = {
 }
 
 const row: React.CSSProperties = { marginTop: 4 }
-const PRIMARY = '#2C2D7D'
+const PRIMARY = '#0F1B3D'
 
 const PROPOSTA_COLUNAS: { key: string; label: string; width: string; numeric?: boolean; anvisa?: boolean }[] = [
   { key: 'item', label: 'Item', width: '6%' },

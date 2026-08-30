@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { dbGet } from '../utils/db'
+import { getEmpresaInfo } from '../utils/empresa'
 import { exportElementsToPdf } from '../utils/pdf'
 import { DECLARACOES, buildDeclaracaoContext, renderDeclaracaoText, DeclaracaoContext } from '../utils/declaracoes'
 import PrintableDeclaracao from './PrintableDeclaracao'
@@ -43,7 +43,7 @@ export default function DeclaracoesSection({ modelo }: { modelo: any }) {
 
   useEffect(() => {
     let mounted = true
-    dbGet('empresa_info').then(v => { if (mounted) setEmpresa(v || null) })
+    getEmpresaInfo().then(v => { if (mounted) setEmpresa(v || null) })
     return () => { mounted = false }
   }, [])
 

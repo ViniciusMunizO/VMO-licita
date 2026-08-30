@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { dbGet, dbSet } from '../utils/db'
+import { getEmpresaInfo, saveEmpresaInfo } from '../utils/empresa'
 import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
 
 type EmpresaInfo = {
@@ -31,8 +31,6 @@ const empty: EmpresaInfo = {
   declaracoesProposta: ''
 }
 
-const STORE_KEY = 'empresa_info'
-
 export default function CompanyInfo() {
   const [form, setForm] = useState<EmpresaInfo>(empty)
   const [loading, setLoading] = useState(true)
@@ -40,7 +38,7 @@ export default function CompanyInfo() {
 
   useEffect(() => {
     let mounted = true
-    dbGet(STORE_KEY).then((raw) => {
+    getEmpresaInfo().then((raw) => {
       if (!mounted) return
       setForm({ ...empty, ...(raw || {}) })
       setLoading(false)
@@ -52,7 +50,7 @@ export default function CompanyInfo() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
-    await dbSet(STORE_KEY, form)
+    await saveEmpresaInfo(form)
     setSavedAt(Date.now())
   }
 

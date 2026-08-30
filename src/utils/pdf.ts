@@ -34,7 +34,7 @@ export async function exportElementsToPdf(
 
   const headerHeight = 44
   const footerHeight = 30
-  const primary = '#2C2D7D'
+  const primary = '#0F1B3D'
   const availableH = pdfPageHeight - headerHeight - footerHeight
 
   let pageIndex = 0
@@ -45,12 +45,15 @@ export async function exportElementsToPdf(
     const rgb = hexToRgb(primary)
     pdf.setFillColor(rgb.r, rgb.g, rgb.b)
     pdf.rect(0, 0, pdfWidth, headerHeight, 'F')
+    const accent = hexToRgb('#EF4136')
+    pdf.setFillColor(accent.r, accent.g, accent.b)
+    pdf.rect(12, 17, 6, 6, 'F')
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
-    pdf.text('Botti Licita', 12, 28)
+    pdf.text('Botti Licita', 24, 28)
     pdf.setFontSize(10)
     pdf.setTextColor(240, 240, 240)
-    pdf.text(`${title} — página ${pageIndex}`, pdfWidth - 12, 28, { align: 'right' })
+    pdf.text(title, pdfWidth - 12, 28, { align: 'right' })
 
     pdf.setFillColor(240, 240, 240)
     pdf.rect(0, pdfPageHeight - footerHeight, pdfWidth, footerHeight, 'F')

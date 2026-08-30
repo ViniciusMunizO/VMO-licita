@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { dbGet, migrateFromLocalStorage } from '../utils/db'
+import { listLicitacoes } from '../utils/licitacoes'
+import { listItems } from '../utils/items'
 import { combineDateTime, formatDateTimeBR } from '../utils/date'
 
 type Licitacao = {
@@ -68,12 +69,11 @@ export default function Dashboard() {
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      await migrateFromLocalStorage()
-      const list = ((await dbGet('licitacoes')) || []) as Licitacao[]
+      const list = (await listLicitacoes()) as Licitacao[]
       if (!mounted) return
       setLicitacoes(list)
 
-      const itemLists = await Promise.all(list.map(l => dbGet(`items_${l.codigo}`)))
+      const itemLists = await Promise.all(list.map(l => listItems(l.codigo)))
       if (!mounted) return
       let total = 0
       let vencedores = 0

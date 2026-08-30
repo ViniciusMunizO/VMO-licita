@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { calcCustoUnitario, calcTotalCusto } from '../utils/format'
+import { listItems, replaceItems } from '../utils/items'
 
 // A planilha de cotação sempre vem no mesmo layout de colunas (A a O), mas o
 // texto do cabeçalho pode se repetir (ex: duas colunas "TOTAL") e o número de
@@ -36,24 +37,18 @@ function rowToItem(row: any[], columns: readonly string[]): Record<string, any> 
 }
 
 export default function ItemsImportModal({ open, onClose, codigo }: { open: boolean; onClose: () => void; codigo: number }) {
-  const key = `items_${codigo}`
   const [items, setItems] = useState<any[]>([])
 
   useEffect(() => {
     let mounted = true
-    import('../utils/db').then(async db => {
-      await db.migrateFromLocalStorage()
-      const raw = await db.dbGet(key)
-      if (!mounted) return
-      setItems(raw || [])
-    })
+    listItems(codigo).then(raw => { if (mounted) setItems(raw || []) })
     return () => { mounted = false }
   }, [open, codigo])
 
   const onFile = (f: File | null) => {
     if (!f) return
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const data = e.target?.result
       const workbook = XLSX.read(data, { type: 'binary' })
       const sheetName = workbook.SheetNames[0]
@@ -66,8 +61,8 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
       const parsed = dataRows
         .map(row => rowToItem(row, columns))
         .filter(it => String(it.descricao || '').trim() !== '')
-      setItems(parsed)
-      import('../utils/db').then(async db => await db.dbSet(key, parsed))
+      const saved = await replaceItems(codigo, parsed)
+      setItems(saved)
     }
     reader.readAsBinaryString(f)
   }
