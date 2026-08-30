@@ -50,7 +50,7 @@ export async function exportElementsToPdf(
     pdf.rect(12, 17, 6, 6, 'F')
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(12)
-    pdf.text('Botti Licita', 24, 28)
+    pdf.text('Licita-VMO', 24, 28)
     pdf.setFontSize(10)
     pdf.setTextColor(240, 240, 240)
     pdf.text(title, pdfWidth - 12, 28, { align: 'right' })
@@ -64,9 +64,12 @@ export async function exportElementsToPdf(
 
   // JPEG em vez de PNG: uma página cheia de texto anti-aliased comprime muito
   // mal em PNG (sem perdas) — no teste com 40 licitações isso gerava um PDF
-  // de mais de 80MB. Em qualidade 0.85 o JPEG fica visualmente idêntico pra
-  // esse tipo de conteúdo (fundo claro + texto) e reduz o arquivo em ~90%.
-  const JPEG_QUALITY = 0.85
+  // de mais de 80MB. Em 0.85 o arquivo ficava pequeno mas o texto saía com
+  // aquele efeito de "borrado"/artefato de compressão (visível de perto).
+  // 0.97 ainda reduz bastante o tamanho frente ao PNG (que é sem perdas),
+  // mas com um nível de compressão baixo o bastante pra não degradar borda
+  // de texto de forma perceptível.
+  const JPEG_QUALITY = 0.97
 
   const addImagePage = (dataUrl: string, renderedHeight: number) => {
     if (!firstPage) pdf.addPage()
@@ -76,7 +79,7 @@ export async function exportElementsToPdf(
   }
 
   for (const el of elements) {
-    const canvas = await html2canvas(el, { scale: 2 })
+    const canvas = await html2canvas(el, { scale: 3 })
     const renderedFullHeight = (canvas.height * pdfWidth) / canvas.width
 
     if (renderedFullHeight <= availableH) {

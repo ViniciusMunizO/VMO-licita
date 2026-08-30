@@ -9,10 +9,13 @@ const DESTAQUES = [
   { titulo: 'Relatórios', texto: 'Ganhos, perdidos e desclassificados, com totais por período.' },
 ]
 
+const EMAIL_LEMBRADO_KEY = 'login_email_lembrado'
+
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_LEMBRADO_KEY) || '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [lembrar, setLembrar] = useState(() => !!localStorage.getItem(EMAIL_LEMBRADO_KEY))
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -24,6 +27,11 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
+      // Só guarda o e-mail (nunca a senha) — a senha em si já fica salva de
+      // forma segura pelo próprio gerenciador de senhas do navegador, graças
+      // ao autoComplete="current-password" no campo abaixo.
+      if (lembrar) localStorage.setItem(EMAIL_LEMBRADO_KEY, email)
+      else localStorage.removeItem(EMAIL_LEMBRADO_KEY)
       nav('/')
     } catch (err: any) {
       setError(err?.message || 'Não foi possível entrar')
@@ -64,7 +72,7 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="relative text-xs text-white/50">© {new Date().getFullYear()} Botti Licita</div>
+        <div className="relative text-xs text-white/50">© {new Date().getFullYear()} Licita-VMO</div>
       </div>
 
       <div className="flex items-center justify-center p-6 sm:p-10 bg-gray-50">
@@ -112,6 +120,15 @@ export default function Login() {
                 </button>
               </div>
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
+              <input
+                type="checkbox"
+                checked={lembrar}
+                onChange={e => setLembrar(e.target.checked)}
+              />
+              Lembrar meu e-mail
+            </label>
 
             {error && (
               <div className="text-sm px-3 py-2 rounded-lg border-l-4" style={{ backgroundColor: '#fef2f2', borderColor: 'var(--color-error)', color: '#b91c1c' }}>
