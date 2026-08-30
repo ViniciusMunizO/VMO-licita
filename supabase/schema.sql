@@ -189,7 +189,16 @@ create policy "autenticado tudo em licitacoes" on licitacoes for all using (auth
 create policy "autenticado tudo em items" on items for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "autenticado tudo em attachments" on attachments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "autenticado tudo em atas" on atas for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "autenticado tudo em audit_logs" on audit_logs for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- audit_logs é só "for insert" + "for select restrito a admin" de propósito
+-- (nunca "for all"): o app só precisa gravar e o admin ler — se qualquer
+-- autenticado pudesse update/delete, a trilha de auditoria vira apagável por
+-- quem ela audita, perdendo a função de registro confiável. Sem policy de
+-- update/delete: RLS nega por padrão (ninguém altera/apaga, nem pela API).
+create policy "autenticado insere em audit_logs" on audit_logs for insert with check (auth.role() = 'authenticated');
+create policy "admin le audit_logs" on audit_logs for select using (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+);
 
 -- ============================================================
 -- Cria o profile automaticamente quando um usuário novo é criado pelo painel
