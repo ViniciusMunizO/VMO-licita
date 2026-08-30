@@ -35,6 +35,19 @@ export function calcTotalCusto(custoUnitario: any, quantidade: any): number | ''
   return Number((cu * q).toFixed(4))
 }
 
+// Formata sempre com um número fixo de casas decimais, diferente de
+// `formatNumeric` que omite decimais quando o valor é exato — cada relatório
+// do sistema atual usa uma precisão diferente pra "Custo": o Relatório de
+// Ganhos mostra valores financeiros fechados em 2 casas (ex.: "20.280,00"),
+// já o Relatório de Itens Perdidos mostra o custo com a mesma precisão de
+// 4 casas usada internamente pelo cálculo de Custo + TX (ex.: "148,2600").
+export function formatFixed(value: any, decimals = 2): string {
+  if (value === undefined || value === null || value === '') return '-'
+  const num = typeof value === 'number' ? value : Number(value)
+  if (isNaN(num)) return String(value)
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num)
+}
+
 // Registro ANVISA tem 13 dígitos; a exibição é limitada a isso pra não
 // estourar a coluna quando o dado vier formatado ou com caracteres a mais.
 export function formatAnvisa(value: any): string {

@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import ListLicitacoes from './pages/Licitacoes/List'
 import FormLicitacao from './pages/Licitacoes/Form'
 import DetailLicitacao from './pages/Licitacoes/Detail'
+import RelatoriosIndex from './pages/Relatorios/Index'
 import Users from './pages/Users'
 import CompanyInfo from './pages/CompanyInfo'
 import AdminAudit from './pages/AdminAudit'
@@ -22,6 +23,7 @@ export default function App() {
           <div className="flex items-center gap-6">
             <Link to="/" className="brand text-lg">Botti Licita</Link>
             <Link to="/licitacoes" className="nav-link text-sm">Licitações</Link>
+            <Link to="/relatorios" className="nav-link text-sm">Relatórios</Link>
             <Link to="/empresa" className="nav-link text-sm">Informações da Empresa</Link>
             {(user?.role === 'admin' || user?.role === 'moderador') && <Link to="/users" className="nav-link text-sm">Usuários</Link>}
           </div>
@@ -38,6 +40,7 @@ export default function App() {
           <Route path="/licitacoes" element={<ProtectedRoute><ListLicitacoes /></ProtectedRoute>} />
           <Route path="/licitacoes/novo" element={<ProtectedRoute><FormLicitacao /></ProtectedRoute>} />
           <Route path="/licitacoes/:codigo" element={<ProtectedRoute><DetailLicitacao /></ProtectedRoute>} />
+          <Route path="/relatorios" element={<ProtectedRoute><RelatoriosIndex /></ProtectedRoute>} />
           <Route path="/empresa" element={<ProtectedRoute><CompanyInfo /></ProtectedRoute>} />
           <Route path="/users" element={<AdminRoute roles={['admin', 'moderador']}><Users /></AdminRoute>} />
           <Route path="/admin/audit" element={<AdminRoute><AdminAudit /></AdminRoute>} />

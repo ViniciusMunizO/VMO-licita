@@ -9,6 +9,14 @@ import AttachmentsModal from '../../components/AttachmentsModal'
 import AtaContratoModal, { Ata } from '../../components/AtaContratoModal'
 import DeclaracoesSection from '../../components/DeclaracoesSection'
 import PrintableChecklist from '../../components/PrintableChecklist'
+import PrintableProposta from '../../components/PrintableProposta'
+import { setLancadoNoKralen } from '../../utils/kralen'
+
+// Limite de caracteres do motivo de desclassificação — grande o suficiente
+// pra uma explicação de verdade (o exemplo real do cliente tem ~140
+// caracteres), mas evita que um texto absurdamente longo pese na gravação
+// no IndexedDB, estoure a célula da tabela nos relatórios ou infle o PDF.
+const MOTIVO_MAX_LENGTH = 500
 
 const HABILITACAO_ITEMS: { key: string; label: string }[] = [
   { key: 'habilitacaoJuridica', label: 'Habilitação Jurídica' },
@@ -60,8 +68,10 @@ export default function DetailLicitacao() {
   const [attachments, setAttachments] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [atas, setAtas] = useState<Ata[]>([])
+  const [empresa, setEmpresa] = useState<any>(null)
   const printRef = useRef<HTMLDivElement | null>(null)
   const itemsRef = useRef<HTMLDivElement | null>(null)
+  const propostaRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -80,10 +90,12 @@ export default function DetailLicitacao() {
         const rawAt = (await dbGet(`attachments_${codigo}`)) || []
         const rawIt = (await dbGet(`items_${codigo}`)) || []
         const rawAtas = (await dbGet(`atas_${codigo}`)) || []
+        const rawEmpresa = (await dbGet('empresa_info')) || null
         if (mounted) {
           setAttachments(rawAt)
           setItems(rawIt)
           setAtas(rawAtas)
+          setEmpresa(rawEmpresa)
         }
       } catch (err) {
         // ignore
@@ -115,6 +127,13 @@ export default function DetailLicitacao() {
     const list = await dbUpdate<Ata[]>(key, (current) => (current || []).filter((a: Ata) => a.id !== id))
     setAtas(list)
   }
+  const toggleKralen = async (checked: boolean) => {
+    const userName = localStorage.getItem('user_name') || undefined
+    const list = await setLancadoNoKralen(model.codigo, checked, userName)
+    const found = list.find((x: any) => String(x.codigo) === String(model.codigo))
+    if (found) setModel(found)
+  }
+
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null)
   const [editItemDraft, setEditItemDraft] = useState<any>(null)
   const [valorGanhoDraft, setValorGanhoDraft] = useState<Record<number, string>>({})
@@ -137,6 +156,58 @@ export default function DetailLicitacao() {
       const { auditLog } = await import('../../utils/audit')
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('item_valor_ganho', { codigo: model.codigo, itemIndex: idx, valorGanho: valor, descricao: list[idx].descricao }, user)
+    } catch (err) { /* ignore */ }
+  }
+
+  const [motivoDraft, setMotivoDraft] = useState<Record<number, string>>({})
+  const [editingMotivoIdx, setEditingMotivoIdx] = useState<number | null>(null)
+
+  // Desclassificar e Vencedor são mutuamente exclusivos — um item desclassificado
+  // nunca chegou a disputar, então marcar um limpa o outro.
+  const marcarDesclassificado = async (idx: number) => {
+    const key = `items_${model.codigo}`
+    const { dbUpdate } = await import('../../utils/db')
+    const list = await dbUpdate<any[]>(key, (current) => {
+      const next = [...(current || [])]
+      next[idx] = { ...(next[idx] || {}), desclassificado: true, vencedor: false }
+      return next
+    })
+    setItems(list)
+    setEditingMotivoIdx(idx)
+    try {
+      const { auditLog } = await import('../../utils/audit')
+      const user = localStorage.getItem('user_name') || undefined
+      await auditLog('item_desclassificar', { codigo: model.codigo, itemIndex: idx, descricao: list[idx].descricao }, user)
+    } catch (err) { /* ignore */ }
+  }
+
+  const reverterDesclassificacao = async (idx: number) => {
+    const key = `items_${model.codigo}`
+    const { dbUpdate } = await import('../../utils/db')
+    const list = await dbUpdate<any[]>(key, (current) => {
+      const next = [...(current || [])]
+      next[idx] = { ...(next[idx] || {}), desclassificado: false }
+      return next
+    })
+    setItems(list)
+  }
+
+  const saveMotivo = async (idx: number, motivo: string) => {
+    const key = `items_${model.codigo}`
+    const motivoLimitado = motivo.slice(0, MOTIVO_MAX_LENGTH)
+    const { dbUpdate } = await import('../../utils/db')
+    const list = await dbUpdate<any[]>(key, (current) => {
+      const next = [...(current || [])]
+      next[idx] = { ...(next[idx] || {}), motivoDesclassificacao: motivoLimitado }
+      return next
+    })
+    setItems(list)
+    setMotivoDraft(d => { const next = { ...d }; delete next[idx]; return next })
+    setEditingMotivoIdx(current => (current === idx ? null : current))
+    try {
+      const { auditLog } = await import('../../utils/audit')
+      const user = localStorage.getItem('user_name') || undefined
+      await auditLog('item_motivo_desclassificacao', { codigo: model.codigo, itemIndex: idx, motivo: motivoLimitado, descricao: list[idx].descricao }, user)
     } catch (err) { /* ignore */ }
   }
 
@@ -194,6 +265,10 @@ export default function DetailLicitacao() {
           >
             {model.status || 'Sem status'}
           </span>
+          <label className="flex items-center gap-2 text-sm font-normal text-gray-600">
+            <input type="checkbox" checked={!!model.lancadoNoKralen} onChange={e => toggleKralen(e.target.checked)} />
+            Lançada no Kralen
+          </label>
         </h3>
         <div className="flex gap-2">
           <button onClick={() => setShowAtaModal(true)} className="btn btn-primary">Novo Contrato</button>
@@ -365,8 +440,8 @@ export default function DetailLicitacao() {
                   <th className="p-2">Custo + TX (Uni)</th>
                   <th className="p-2">Total Custo</th>
                   <th className="p-2">Custo Caixa</th>
-                  <th className="p-2">Vencedor</th>
-                  <th className="p-2">Valor Ganho</th>
+                  <th className="p-2">Resultado</th>
+                  <th className="p-2">Valor Ganho / Motivo</th>
                 </tr>
               </thead>
               <tbody>
@@ -400,7 +475,17 @@ export default function DetailLicitacao() {
                         <td className="p-2">{formatNumeric(it.totalCusto)}</td>
                         <td className="p-2">{formatNumeric(it.custoCaixa)}</td>
                         <td className="p-2" onClick={e => e.stopPropagation()}>
-                          {it.vencedor ? (
+                          {it.desclassificado ? (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-white px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--color-error)' }}>✕ Desclassificado</span>
+                              <button
+                                onClick={() => reverterDesclassificacao(idx)}
+                                className="text-xs text-gray-400 hover:text-gray-600 underline"
+                              >
+                                desmarcar
+                              </button>
+                            </div>
+                          ) : it.vencedor ? (
                             <div className="flex items-center gap-2">
                               <span className="inline-flex items-center gap-1 text-xs font-semibold text-white px-2 py-1 rounded-full" style={{ backgroundColor: '#15803d' }}>✓ Vencedor</span>
                               <button
@@ -425,31 +510,78 @@ export default function DetailLicitacao() {
                               </button>
                             </div>
                           ) : (
-                            <button
-                              onClick={async () => {
-                                const key = `items_${model.codigo}`
-                                const { dbUpdate } = await import('../../utils/db')
-                                const list = await dbUpdate<any[]>(key, (current) => {
-                                  const next = [...(current || [])]
-                                  next[idx] = { ...(next[idx] || {}), vencedor: true }
-                                  return next
-                                })
-                                setItems(list)
-                                setEditingValorGanhoIdx(idx)
-                                try {
-                                  const { auditLog } = await import('../../utils/audit')
-                                  const user = localStorage.getItem('user_name') || undefined
-                                  await auditLog('item_mark_winner', { codigo: model.codigo, itemIndex: idx, vencedor: true, descricao: list[idx].descricao }, user)
-                                } catch (err) { /* ignore */ }
-                              }}
-                              className="btn btn-ghost text-xs px-3 py-1.5 font-medium"
-                            >
-                              Venceu
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  const key = `items_${model.codigo}`
+                                  const { dbUpdate } = await import('../../utils/db')
+                                  const list = await dbUpdate<any[]>(key, (current) => {
+                                    const next = [...(current || [])]
+                                    next[idx] = { ...(next[idx] || {}), vencedor: true }
+                                    return next
+                                  })
+                                  setItems(list)
+                                  setEditingValorGanhoIdx(idx)
+                                  try {
+                                    const { auditLog } = await import('../../utils/audit')
+                                    const user = localStorage.getItem('user_name') || undefined
+                                    await auditLog('item_mark_winner', { codigo: model.codigo, itemIndex: idx, vencedor: true, descricao: list[idx].descricao }, user)
+                                  } catch (err) { /* ignore */ }
+                                }}
+                                className="btn btn-ghost text-xs px-3 py-1.5 font-medium"
+                              >
+                                Venceu
+                              </button>
+                              <button
+                                onClick={() => marcarDesclassificado(idx)}
+                                className="btn btn-ghost text-xs px-3 py-1.5 font-medium"
+                                style={{ color: 'var(--color-error)' }}
+                              >
+                                Desclassificar
+                              </button>
+                            </div>
                           )}
                         </td>
                         <td className="p-2" onClick={e => e.stopPropagation()}>
-                          {!it.vencedor ? (
+                          {it.desclassificado ? (
+                            editingMotivoIdx === idx || !it.motivoDesclassificacao ? (
+                              <div className="flex items-center gap-1">
+                                <div className="flex flex-col">
+                                  <input
+                                    type="text"
+                                    placeholder="Motivo da desclassificação"
+                                    autoFocus={editingMotivoIdx === idx}
+                                    maxLength={MOTIVO_MAX_LENGTH}
+                                    value={motivoDraft[idx] ?? it.motivoDesclassificacao ?? ''}
+                                    onChange={e => setMotivoDraft(d => ({ ...d, [idx]: e.target.value }))}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveMotivo(idx, (e.target as HTMLInputElement).value) }}
+                                    className="w-48 p-1 rounded text-sm"
+                                  />
+                                  <span className="text-[10px] text-gray-400 mt-0.5">
+                                    {(motivoDraft[idx] ?? it.motivoDesclassificacao ?? '').length}/{MOTIVO_MAX_LENGTH}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => saveMotivo(idx, motivoDraft[idx] ?? it.motivoDesclassificacao ?? '')}
+                                  className="btn btn-primary text-xs px-2 py-1"
+                                >
+                                  OK
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-800 break-words" title={it.motivoDesclassificacao}>
+                                  {it.motivoDesclassificacao.length > 40 ? it.motivoDesclassificacao.slice(0, 40) + '…' : it.motivoDesclassificacao}
+                                </span>
+                                <button
+                                  onClick={() => setEditingMotivoIdx(idx)}
+                                  className="text-xs text-gray-400 hover:text-gray-600 underline"
+                                >
+                                  editar
+                                </button>
+                              </div>
+                            )
+                          ) : !it.vencedor ? (
                             <span className="text-sm text-gray-400">—</span>
                           ) : editingValorGanhoIdx === idx || !it.valorGanho ? (
                             <div className="flex items-center gap-1">
@@ -568,13 +700,23 @@ export default function DetailLicitacao() {
         }} className="btn btn-primary">Imprimir Checklist</button>
         <button onClick={async () => {
           if (!itemsRef.current) return
-          await exportElementsToPdf([itemsRef.current], `itens_${model.codigo}.pdf`, 'Itens')
+          await exportElementsToPdf([itemsRef.current], `itens_${model.codigo}.pdf`, 'Itens', 'landscape')
         }} className="btn btn-primary">Exportar Itens (PDF)</button>
+        <button onClick={async () => {
+          if (!propostaRef.current) return
+          await exportElementsToPdf([propostaRef.current], `proposta_${model.codigo}.pdf`, 'Proposta de Preços')
+          try {
+            const { auditLog } = await import('../../utils/audit')
+            const userName = localStorage.getItem('user_name') || undefined
+            await auditLog('proposta_emitida', { codigo: model.codigo }, userName)
+          } catch (err) { /* ignore */ }
+        }} className="btn btn-primary">Emitir Proposta (PDF)</button>
       </div>
 
       {/* hidden printable DOM */}
       <div style={{ position: 'absolute', left: -9999 }} aria-hidden>
         <PrintableChecklist modelo={model} codigo={model.codigo} user={user} habilitacao={model.habilitacao} page1Ref={printRef} page2Ref={itemsRef} items={items} attachments={attachments} />
+        <PrintableProposta modelo={model} items={items} empresa={empresa} pageRef={propostaRef} />
       </div>
 
       <AttachmentsModal open={openAttachments} onClose={async () => {

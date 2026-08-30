@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { dbGet } from '../utils/db'
 import { formatDateTimeBR } from '../utils/date'
 import { formatNumeric, formatAnvisa } from '../utils/format'
+import { agruparPorLote, somaColuna } from '../utils/itens'
 
 type Props = {
   modelo: any
@@ -71,27 +72,8 @@ function Box({ title, children }: { title: string; children: React.ReactNode }) 
   )
 }
 
-// Agrupa os itens por lote preservando a ordem de primeira aparição de cada
-// lote na planilha — evita depender de ordenação numérica/alfabética quando
-// o rótulo do lote não é necessariamente um número puro.
-function agruparPorLote(items: any[]): { lote: string | null; items: any[] }[] {
-  const temLote = items.some(it => it.lote)
-  if (!temLote) return [{ lote: null, items }]
-  const grupos = new Map<string, any[]>()
-  for (const it of items) {
-    const chave = String(it.lote || 'Sem lote')
-    if (!grupos.has(chave)) grupos.set(chave, [])
-    grupos.get(chave)!.push(it)
-  }
-  return Array.from(grupos.entries()).map(([lote, items]) => ({ lote, items }))
-}
-
 const TOTAL_EDITAL_INDEX = ITEM_COLUMNS.findIndex(c => c.key === 'totalEdital')
 const TOTAL_CUSTO_INDEX = ITEM_COLUMNS.findIndex(c => c.key === 'totalCusto')
-
-function somaColuna(items: any[], key: string): number {
-  return items.reduce((soma, it) => soma + (Number(it[key]) || 0), 0)
-}
 
 function ItemsTable({ items, subtotalLabel, subtotalStyle }: { items: any[]; subtotalLabel?: string; subtotalStyle?: React.CSSProperties }) {
   return (

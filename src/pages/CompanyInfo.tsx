@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { dbGet, dbSet } from '../utils/db'
+import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
 
 type EmpresaInfo = {
   razaoSocial: string
@@ -19,13 +20,15 @@ type EmpresaInfo = {
   representanteCargo: string
   representanteCpf: string
   representanteRg: string
+  declaracoesProposta: string
 }
 
 const empty: EmpresaInfo = {
   razaoSocial: '', cnpj: '', inscricaoEstadual: '', inscricaoMunicipal: '',
   endereco: '', cep: '', cidade: '', uf: '', telefone: '', email: '',
   banco: '', agencia: '', conta: '',
-  representanteNome: '', representanteCargo: '', representanteCpf: '', representanteRg: ''
+  representanteNome: '', representanteCargo: '', representanteCpf: '', representanteRg: '',
+  declaracoesProposta: ''
 }
 
 const STORE_KEY = 'empresa_info'
@@ -150,6 +153,18 @@ export default function CompanyInfo() {
               <input value={form.representanteRg} onChange={set('representanteRg')} className="w-full p-2 rounded" />
             </div>
           </div>
+        </div>
+
+        <div className="mt-6 bg-white border rounded p-4">
+          <h4 className="font-semibold mb-1">Modelo de Proposta</h4>
+          <p className="text-sm text-gray-500 mb-3">Texto de declarações usado ao emitir a Proposta de Preços. Deixe em branco para usar o texto padrão, ou personalize (ex.: acrescentar cláusulas específicas do seu ramo).</p>
+          <textarea
+            value={form.declaracoesProposta}
+            onChange={e => setForm(f => ({ ...f, declaracoesProposta: e.target.value }))}
+            className="w-full p-2 rounded"
+            rows={5}
+            placeholder={DECLARACAO_PROPOSTA_PADRAO}
+          />
         </div>
 
         <div className="flex items-center gap-3">

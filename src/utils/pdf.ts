@@ -10,35 +10,38 @@ function hexToRgb(hex: string) {
   return { r, g, b }
 }
 
-export async function exportElementsToPdf(elements: HTMLElement[], filename = 'documento.pdf', title = 'Documento') {
-  const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+// Recorta uma faixa horizontal do canvas de origem (em pixels do canvas) para
+// um canvas novo — usado para dividir um elemento alto em várias páginas de
+// PDF, em vez de espremer o conteúdo inteiro numa página só.
+function fatiarCanvas(origem: HTMLCanvasElement, sy: number, altura: number): HTMLCanvasElement {
+  const fatia = document.createElement('canvas')
+  fatia.width = origem.width
+  fatia.height = altura
+  const ctx = fatia.getContext('2d')!
+  ctx.drawImage(origem, 0, sy, origem.width, altura, 0, 0, origem.width, altura)
+  return fatia
+}
+
+export async function exportElementsToPdf(
+  elements: HTMLElement[],
+  filename = 'documento.pdf',
+  title = 'Documento',
+  orientation: 'portrait' | 'landscape' = 'portrait'
+) {
+  const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation })
   const pdfWidth = pdf.internal.pageSize.getWidth()
   const pdfPageHeight = pdf.internal.pageSize.getHeight()
 
   const headerHeight = 44
   const footerHeight = 30
   const primary = '#2C2D7D'
-  const secondary = '#5f60af'
+  const availableH = pdfPageHeight - headerHeight - footerHeight
 
   let pageIndex = 0
+  let firstPage = true
 
-  for (let i = 0; i < elements.length; i++) {
-    const el = elements[i]
-    const canvas = await html2canvas(el, { scale: 2 })
-    const imgData = canvas.toDataURL('image/png')
-    const imgProps = pdf.getImageProperties(imgData)
-    let imgRenderedHeight = (imgProps.height * pdfWidth) / imgProps.width
-
-    const availableH = pdfPageHeight - headerHeight - footerHeight
-    if (imgRenderedHeight > availableH) {
-      const scale = availableH / imgRenderedHeight
-      imgRenderedHeight = imgRenderedHeight * scale
-    }
-
-    if (i > 0) pdf.addPage()
+  const drawHeaderFooter = () => {
     pageIndex += 1
-
-    // draw header
     const rgb = hexToRgb(primary)
     pdf.setFillColor(rgb.r, rgb.g, rgb.b)
     pdf.rect(0, 0, pdfWidth, headerHeight, 'F')
@@ -49,11 +52,6 @@ export async function exportElementsToPdf(elements: HTMLElement[], filename = 'd
     pdf.setTextColor(240, 240, 240)
     pdf.text(`${title} — página ${pageIndex}`, pdfWidth - 12, 28, { align: 'right' })
 
-    // add the content image below header
-    const y = headerHeight + 8
-    pdf.addImage(imgData, 'PNG', 0, y, pdfWidth, imgRenderedHeight)
-
-    // footer with page number
     pdf.setFillColor(240, 240, 240)
     pdf.rect(0, pdfPageHeight - footerHeight, pdfWidth, footerHeight, 'F')
     pdf.setTextColor(60, 60, 60)
@@ -61,6 +59,45 @@ export async function exportElementsToPdf(elements: HTMLElement[], filename = 'd
     pdf.text(`Página ${pageIndex}`, pdfWidth / 2 - 20, pdfPageHeight - footerHeight / 2 + 4)
   }
 
+  // JPEG em vez de PNG: uma página cheia de texto anti-aliased comprime muito
+  // mal em PNG (sem perdas) — no teste com 40 licitações isso gerava um PDF
+  // de mais de 80MB. Em qualidade 0.85 o JPEG fica visualmente idêntico pra
+  // esse tipo de conteúdo (fundo claro + texto) e reduz o arquivo em ~90%.
+  const JPEG_QUALITY = 0.85
+
+  const addImagePage = (dataUrl: string, renderedHeight: number) => {
+    if (!firstPage) pdf.addPage()
+    firstPage = false
+    drawHeaderFooter()
+    pdf.addImage(dataUrl, 'JPEG', 0, headerHeight + 8, pdfWidth, renderedHeight)
+  }
+
+  for (const el of elements) {
+    const canvas = await html2canvas(el, { scale: 2 })
+    const renderedFullHeight = (canvas.height * pdfWidth) / canvas.width
+
+    if (renderedFullHeight <= availableH) {
+      // Cabe inteiro numa página, sem precisar reduzir nem fatiar.
+      addImagePage(canvas.toDataURL('image/jpeg', JPEG_QUALITY), renderedFullHeight)
+      continue
+    }
+
+    // Conteúdo mais alto que uma página: em vez de encolher tudo pra caber
+    // numa página só (o que deixava relatórios longos ilegíveis), fatia o
+    // canvas em pedaços do tamanho de uma página e continua em páginas
+    // seguintes — o corte pode cair no meio de uma linha da tabela, mas o
+    // texto continua no tamanho normal, legível.
+    const pxPorPt = canvas.width / pdfWidth
+    const alturaFatiaPx = Math.max(1, Math.floor(availableH * pxPorPt))
+    let sy = 0
+    while (sy < canvas.height) {
+      const alturaEstaFatia = Math.min(alturaFatiaPx, canvas.height - sy)
+      const fatia = fatiarCanvas(canvas, sy, alturaEstaFatia)
+      const alturaRenderizada = (alturaEstaFatia * pdfWidth) / canvas.width
+      addImagePage(fatia.toDataURL('image/jpeg', JPEG_QUALITY), alturaRenderizada)
+      sy += alturaEstaFatia
+    }
+  }
+
   pdf.save(filename)
 }
-
