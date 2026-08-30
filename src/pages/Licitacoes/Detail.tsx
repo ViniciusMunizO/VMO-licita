@@ -209,7 +209,7 @@ export default function DetailLicitacao() {
   const hasLotes = items.some(it => it.lote)
 
   if (!model) return (
-    <div className="bg-white p-6 rounded shadow max-w-3xl mx-auto">
+    <div className="bg-white p-6 rounded shadow max-w-5xl mx-auto">
       <p className="text-sm text-gray-600">Licitação não encontrada.</p>
       <div className="mt-4">
         <button onClick={() => nav('/licitacoes')} className="btn btn-ghost">Voltar</button>

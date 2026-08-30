@@ -57,7 +57,7 @@ export default function CompanyInfo() {
   if (loading) return <div className="text-sm text-gray-500">Carregando...</div>
 
   return (
-    <div className="bg-white p-6 rounded shadow max-w-3xl mx-auto">
+    <div className="bg-white p-6 rounded shadow max-w-5xl mx-auto">
       <h3 className="text-xl font-semibold mb-1">Informações da Empresa</h3>
       <p className="text-sm text-gray-500 mb-4">Esses dados são usados automaticamente nos documentos emitidos pelo sistema.</p>
 

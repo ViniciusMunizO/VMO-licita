@@ -115,7 +115,7 @@ export default function FormLicitacao() {
   }, [])
 
   return (
-    <div className="bg-white p-6 rounded shadow max-w-3xl mx-auto">
+    <div className="bg-white p-6 rounded shadow max-w-5xl mx-auto">
       <h3 className="text-xl font-semibold mb-4">Nova Licitação</h3>
       <form onSubmit={save} className="space-y-4">
         <div className="grid grid-cols-3 gap-4">

@@ -12,7 +12,7 @@ export default function AdminAudit() {
   }, [])
 
   return (
-    <div className="bg-white p-6 rounded shadow max-w-4xl">
+    <div className="bg-white p-6 rounded shadow max-w-5xl">
       <h3 className="text-xl font-semibold mb-4">Audit Log</h3>
       <div className="max-h-96 overflow-auto border rounded p-2">
         {logs.length === 0 && <div className="text-sm text-gray-500">Nenhum log de auditoria.</div>}
