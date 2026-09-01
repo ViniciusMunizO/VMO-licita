@@ -64,6 +64,7 @@ export default function RelatorioGanhos() {
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
   const [filtro, setFiltro] = useState<'naoLancados' | 'todos'>('naoLancados')
+  const [busca, setBusca] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('todos')
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
@@ -89,8 +90,14 @@ export default function RelatorioGanhos() {
     setLicitacoes(list)
   }
 
+  const termoBusca = busca.trim().toLowerCase()
+
   const ganhos: LicitacaoGanha[] = licitacoes
     .map(l => ({ licitacao: l, itensVencedores: (itemsByCodigo[String(l.codigo)] || []).filter((it: any) => it.vencedor) }))
+    .map(g => termoBusca
+      ? { ...g, itensVencedores: g.itensVencedores.filter((it: any) => (it.descricao || '').toLowerCase().includes(termoBusca)) }
+      : g
+    )
     .filter(g => g.itensVencedores.length > 0)
     .filter(g => filtro === 'todos' || !g.licitacao.lancadoNoKralen)
     .filter(g => dataDentroDoPeriodo(g.licitacao.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
@@ -115,11 +122,24 @@ export default function RelatorioGanhos() {
           </div>
         </div>
         <button
-          onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_licitacoes_ganhas.pdf', 'Relatório Geral das Licitações Ganhas', 'landscape')}
+          onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_ganhos.pdf', 'Relatório Geral de Itens Ganhos', 'landscape')}
           className="btn btn-primary"
         >
           Exportar (PDF)
         </button>
+      </div>
+
+      <div className="flex items-center gap-2 mb-4 max-w-sm">
+        <input
+          type="text"
+          value={busca}
+          onChange={e => setBusca(e.target.value)}
+          placeholder="Buscar item ganho por nome/descrição..."
+          className="w-full p-2 rounded text-sm"
+        />
+        {busca && (
+          <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -147,11 +167,16 @@ export default function RelatorioGanhos() {
       </div>
 
       <div ref={containerRef} className="bg-white p-4 rounded shadow overflow-x-auto">
-        <h3 className="text-xl font-bold text-center mb-1">Relatório Geral das Licitações Ganhas</h3>
+        <h3 className="text-xl font-bold text-center mb-1">Relatório Geral de Itens Ganhos</h3>
         <div className="text-center text-xs text-gray-500 mb-4">
           {PERIODOS.find(p => p.id === periodo)?.label}
           {periodo === 'custom' && (dataInicioCustom || dataFimCustom) ? ` (${dataInicioCustom ? formatDateTimeBR(dataInicioCustom) : '…'} até ${dataFimCustom ? formatDateTimeBR(dataFimCustom) : 'hoje'})` : ''}
         </div>
+        {termoBusca && (
+          <div className="text-center text-xs text-gray-500 mb-4">
+            Filtrando por: <strong>{busca}</strong> — {ganhos.length} licitação(ões) encontrada(s)
+          </div>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           <div className="bg-indigo-50 border border-indigo-100 rounded p-3 text-center">
@@ -176,7 +201,9 @@ export default function RelatorioGanhos() {
           <div className="text-sm text-gray-500">Carregando...</div>
         ) : ganhos.length === 0 ? (
           <div className="text-sm text-gray-500">
-            {filtro === 'naoLancados' ? 'Nenhum ganho pendente de lançamento no Kralen.' : 'Nenhum item vencedor cadastrado ainda.'}
+            {termoBusca
+              ? `Nenhum item ganho encontrado com "${busca}".`
+              : filtro === 'naoLancados' ? 'Nenhum ganho pendente de lançamento no Kralen.' : 'Nenhum item vencedor cadastrado ainda.'}
           </div>
         ) : (
           <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>

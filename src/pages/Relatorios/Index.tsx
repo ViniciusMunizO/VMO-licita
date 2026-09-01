@@ -8,7 +8,7 @@ type TipoRelatorio = 'status' | 'ganhos' | 'itensPerdidos' | 'desclassificadas'
 
 const TIPOS: { id: TipoRelatorio; label: string; disponivel: boolean }[] = [
   { id: 'status', label: 'Status das Licitações', disponivel: true },
-  { id: 'ganhos', label: 'Licitações Ganhas', disponivel: true },
+  { id: 'ganhos', label: 'Itens Ganhos', disponivel: true },
   { id: 'itensPerdidos', label: 'Itens Perdidos', disponivel: true },
   { id: 'desclassificadas', label: 'Itens Desclassificados', disponivel: true },
 ]

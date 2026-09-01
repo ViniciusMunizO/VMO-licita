@@ -9,12 +9,19 @@ import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import StatusBadge from '../../components/StatusBadge'
 
 type Filtro = 'todas' | 'Ganhou' | 'Perdeu' | 'semStatus'
+type FiltroKralen = 'todas' | 'lancadas' | 'naoLancadas'
 
 const FILTROS: { id: Filtro; label: string }[] = [
   { id: 'todas', label: 'Todas' },
   { id: 'Ganhou', label: 'Ganhou' },
   { id: 'Perdeu', label: 'Perdeu' },
   { id: 'semStatus', label: 'Sem status' },
+]
+
+const FILTROS_KRALEN: { id: FiltroKralen; label: string }[] = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'lancadas', label: 'Lançadas no Kralen' },
+  { id: 'naoLancadas', label: 'Não lançadas no Kralen' },
 ]
 
 function contratanteNome(l: any) {
@@ -29,6 +36,7 @@ export default function RelatorioStatusLicitacoes() {
   const [loading, setLoading] = useState(true)
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [filtro, setFiltro] = useState<Filtro>('todas')
+  const [filtroKralen, setFiltroKralen] = useState<FiltroKralen>('todas')
   const [periodo, setPeriodo] = useState<Periodo>('todos')
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
@@ -47,11 +55,17 @@ export default function RelatorioStatusLicitacoes() {
   const decididas = ganhouCount + perdeuCount
   const taxaSucesso = decididas > 0 ? (ganhouCount / decididas) * 100 : null
 
-  const listaFiltrada = noPeriodo.filter(l => {
-    if (filtro === 'todas') return true
-    if (filtro === 'semStatus') return !l.status
-    return l.status === filtro
-  })
+  const listaFiltrada = noPeriodo
+    .filter(l => {
+      if (filtro === 'todas') return true
+      if (filtro === 'semStatus') return !l.status
+      return l.status === filtro
+    })
+    .filter(l => {
+      if (filtroKralen === 'todas') return true
+      if (filtroKralen === 'lancadas') return !!l.lancadoNoKralen
+      return !l.lancadoNoKralen
+    })
 
   return (
     <div>
@@ -77,6 +91,22 @@ export default function RelatorioStatusLicitacoes() {
         >
           Exportar (PDF)
         </button>
+      </div>
+
+      <div className="flex items-center gap-4 mb-4">
+        <span className="text-sm text-gray-600">Kralen:</span>
+        <div className="flex gap-2">
+          {FILTROS_KRALEN.map(f => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltroKralen(f.id)}
+              className={filtroKralen === f.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -145,6 +175,7 @@ export default function RelatorioStatusLicitacoes() {
                 <th className="p-1.5">Órgão:</th>
                 <th className="p-1.5">Pregão:</th>
                 <th className="p-1.5">Status:</th>
+                <th className="p-1.5">Kralen:</th>
               </tr>
             </thead>
             <tbody>
@@ -160,6 +191,7 @@ export default function RelatorioStatusLicitacoes() {
                   </td>
                   <td className="p-1.5">{l.numeroPregao ? `nº ${l.numeroPregao}` : '-'}</td>
                   <td className="p-1.5"><StatusBadge status={l.status} /></td>
+                  <td className="p-1.5 text-gray-600">{l.lancadoNoKralen ? 'Sim' : 'Não'}</td>
                 </tr>
               ))}
             </tbody>

@@ -45,6 +45,7 @@ export default function RelatorioItensDesclassificados() {
   const [loading, setLoading] = useState(true)
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
+  const [busca, setBusca] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -61,15 +62,33 @@ export default function RelatorioItensDesclassificados() {
     load()
   }, [])
 
+  const termoBusca = busca.trim().toLowerCase()
+
   const desclassificados: LicitacaoDesclassificada[] = licitacoes
     .map(l => ({ licitacao: l, itensDesclassificados: (itemsByCodigo[String(l.codigo)] || []).filter((it: any) => it.desclassificado) }))
+    .map(g => termoBusca
+      ? { ...g, itensDesclassificados: g.itensDesclassificados.filter((it: any) => (it.descricao || '').toLowerCase().includes(termoBusca)) }
+      : g
+    )
     .filter(g => g.itensDesclassificados.length > 0)
 
   const todosItensDesclassificados = desclassificados.flatMap(g => g.itensDesclassificados)
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4 gap-4">
+        <div className="flex items-center gap-2 flex-1 max-w-sm">
+          <input
+            type="text"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar item desclassificado por nome/descrição..."
+            className="w-full p-2 rounded text-sm"
+          />
+          {busca && (
+            <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
+          )}
+        </div>
         <button
           onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_desclassificados.pdf', 'Relatório - Licitações/Itens Desclassificadas', 'landscape')}
           className="btn btn-primary"
@@ -80,11 +99,18 @@ export default function RelatorioItensDesclassificados() {
 
       <div ref={containerRef} className="bg-white p-4 rounded shadow overflow-x-auto">
         <h3 className="text-xl font-bold text-center mb-4">Relatório - Licitações/Itens Desclassificadas - Detalhado</h3>
+        {termoBusca && (
+          <div className="text-center text-xs text-gray-500 mb-4">
+            Filtrando por: <strong>{busca}</strong> — {desclassificados.length} licitação(ões) encontrada(s)
+          </div>
+        )}
 
         {loading ? (
           <div className="text-sm text-gray-500">Carregando...</div>
         ) : desclassificados.length === 0 ? (
-          <div className="text-sm text-gray-500">Nenhum item desclassificado cadastrado ainda.</div>
+          <div className="text-sm text-gray-500">
+            {termoBusca ? `Nenhum item desclassificado encontrado com "${busca}".` : 'Nenhum item desclassificado cadastrado ainda.'}
+          </div>
         ) : (
           <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
             <Colgroup />
