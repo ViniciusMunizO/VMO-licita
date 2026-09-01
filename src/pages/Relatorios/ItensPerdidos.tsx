@@ -53,6 +53,7 @@ export default function RelatorioItensPerdidos() {
   const [loading, setLoading] = useState(true)
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
+  const [busca, setBusca] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -69,19 +70,37 @@ export default function RelatorioItensPerdidos() {
     load()
   }, [])
 
+  const termoBusca = busca.trim().toLowerCase()
+
   const perdidos: LicitacaoPerdida[] = licitacoes
     .map(l => {
       const items = itemsByCodigo[String(l.codigo)] || []
       if (!licitacaoDecidida(l, items)) return { licitacao: l, itensPerdidos: [] }
       return { licitacao: l, itensPerdidos: items.filter((it: any) => !it.vencedor) }
     })
+    .map(g => termoBusca
+      ? { ...g, itensPerdidos: g.itensPerdidos.filter((it: any) => (it.descricao || '').toLowerCase().includes(termoBusca)) }
+      : g
+    )
     .filter(g => g.itensPerdidos.length > 0)
 
   const todosItensPerdidos = perdidos.flatMap(g => g.itensPerdidos)
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4 gap-4">
+        <div className="flex items-center gap-2 flex-1 max-w-sm">
+          <input
+            type="text"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar item perdido por nome/descrição..."
+            className="w-full p-2 rounded text-sm"
+          />
+          {busca && (
+            <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
+          )}
+        </div>
         <button
           onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_perdidos.pdf', 'Relatório Geral de Itens Perdidos', 'landscape')}
           className="btn btn-primary"
@@ -92,11 +111,18 @@ export default function RelatorioItensPerdidos() {
 
       <div ref={containerRef} className="bg-white p-4 rounded shadow overflow-x-auto">
         <h3 className="text-xl font-bold text-center mb-4">Relatório Geral de Itens Perdidos</h3>
+        {termoBusca && (
+          <div className="text-center text-xs text-gray-500 mb-4">
+            Filtrando por: <strong>{busca}</strong> — {perdidos.length} licitação(ões) encontrada(s)
+          </div>
+        )}
 
         {loading ? (
           <div className="text-sm text-gray-500">Carregando...</div>
         ) : perdidos.length === 0 ? (
-          <div className="text-sm text-gray-500">Nenhum item perdido em licitações já decididas.</div>
+          <div className="text-sm text-gray-500">
+            {termoBusca ? `Nenhum item perdido encontrado com "${busca}".` : 'Nenhum item perdido em licitações já decididas.'}
+          </div>
         ) : (
           <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
             <Colgroup />

@@ -16,6 +16,7 @@ import { listAttachments } from '../../utils/attachments'
 import { listAtas, addAta, removeAta as removeAtaApi } from '../../utils/atas'
 import { getEmpresaInfo } from '../../utils/empresa'
 import { auditLog } from '../../utils/audit'
+import StatusBadge from '../../components/StatusBadge'
 
 // Limite de caracteres do motivo de desclassificação — grande o suficiente
 // pra uma explicação de verdade (o exemplo real do cliente tem ~140
@@ -222,16 +223,7 @@ export default function DetailLicitacao() {
       <div className="flex justify-between items-start">
         <h3 className="text-xl font-semibold flex items-center gap-3">
           Licitação {model.codigo} — {model.ano}
-          <span
-            className="text-xs font-medium px-2 py-1 rounded-full"
-            style={
-              model.status === 'Ganhou' ? { backgroundColor: '#dcfce7', color: '#15803d' }
-                : model.status === 'Perdeu' ? { backgroundColor: '#fee2e2', color: 'var(--color-error)' }
-                : { backgroundColor: '#f3f4f6', color: '#6b7280' }
-            }
-          >
-            {model.status || 'Sem status'}
-          </span>
+          <StatusBadge status={model.status} />
           <label className="flex items-center gap-2 text-sm font-normal text-gray-600">
             <input type="checkbox" checked={!!model.lancadoNoKralen} onChange={e => toggleKralen(e.target.checked)} />
             Lançada no Kralen

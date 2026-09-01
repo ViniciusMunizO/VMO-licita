@@ -2,39 +2,17 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listLicitacoes } from '../../utils/licitacoes'
 import { listItems } from '../../utils/items'
-import { formatDateTimeBR, splitLegacyDateTime, nowInBrasilia, addMonthsToDate } from '../../utils/date'
+import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed } from '../../utils/format'
 import { agruparPorLote, somaColuna } from '../../utils/itens'
 import { setLancadoNoKralen } from '../../utils/kralen'
 import { exportElementsToPdf } from '../../utils/pdf'
+import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 
 type LicitacaoGanha = {
   licitacao: any
   itensVencedores: any[]
-}
-
-type Periodo = 'todos' | '1m' | '3m' | '6m' | '1a' | 'custom'
-
-const PERIODOS: { id: Periodo; label: string }[] = [
-  { id: 'todos', label: 'Todo o período' },
-  { id: '1m', label: 'Último mês' },
-  { id: '3m', label: 'Últimos 3 meses' },
-  { id: '6m', label: 'Últimos 6 meses' },
-  { id: '1a', label: 'Último ano' },
-  { id: 'custom', label: 'Data específica' },
-]
-
-// Início do intervalo pra cada período pré-definido, contado a partir de
-// hoje — "custom" usa as datas escolhidas manualmente, tratado à parte.
-function inicioParaPeriodo(periodo: Periodo, hoje: string): string {
-  switch (periodo) {
-    case '1m': return addMonthsToDate(hoje, -1)
-    case '3m': return addMonthsToDate(hoje, -3)
-    case '6m': return addMonthsToDate(hoje, -6)
-    case '1a': return addMonthsToDate(hoje, -12)
-    default: return ''
-  }
 }
 
 function formatMoneyBRL(value: number): string {
@@ -111,22 +89,11 @@ export default function RelatorioGanhos() {
     setLicitacoes(list)
   }
 
-  const dentroDoPeriodo = (l: any): boolean => {
-    if (periodo === 'todos') return true
-    const dataLic = splitLegacyDateTime(l.dataLicitacao).date
-    if (!dataLic) return false
-    const inicio = periodo === 'custom' ? dataInicioCustom : inicioParaPeriodo(periodo, hoje)
-    const fim = periodo === 'custom' ? (dataFimCustom || hoje) : hoje
-    if (inicio && dataLic < inicio) return false
-    if (fim && dataLic > fim) return false
-    return true
-  }
-
   const ganhos: LicitacaoGanha[] = licitacoes
     .map(l => ({ licitacao: l, itensVencedores: (itemsByCodigo[String(l.codigo)] || []).filter((it: any) => it.vencedor) }))
     .filter(g => g.itensVencedores.length > 0)
     .filter(g => filtro === 'todos' || !g.licitacao.lancadoNoKralen)
-    .filter(g => dentroDoPeriodo(g.licitacao))
+    .filter(g => dataDentroDoPeriodo(g.licitacao.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
 
   const todosItensVencedores = ganhos.flatMap(g => g.itensVencedores)
   const totalCustoGeral = somaColuna(todosItensVencedores, 'totalCusto')

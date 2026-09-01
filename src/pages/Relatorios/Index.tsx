@@ -2,17 +2,19 @@ import React, { useState } from 'react'
 import RelatorioGanhos from './Ganhos'
 import RelatorioItensPerdidos from './ItensPerdidos'
 import RelatorioItensDesclassificados from './ItensDesclassificados'
+import RelatorioStatusLicitacoes from './StatusLicitacoes'
 
-type TipoRelatorio = 'ganhos' | 'itensPerdidos' | 'desclassificadas'
+type TipoRelatorio = 'status' | 'ganhos' | 'itensPerdidos' | 'desclassificadas'
 
 const TIPOS: { id: TipoRelatorio; label: string; disponivel: boolean }[] = [
+  { id: 'status', label: 'Status das Licitações', disponivel: true },
   { id: 'ganhos', label: 'Licitações Ganhas', disponivel: true },
   { id: 'itensPerdidos', label: 'Itens Perdidos', disponivel: true },
   { id: 'desclassificadas', label: 'Itens Desclassificados', disponivel: true },
 ]
 
 export default function RelatoriosIndex() {
-  const [tipo, setTipo] = useState<TipoRelatorio>('ganhos')
+  const [tipo, setTipo] = useState<TipoRelatorio>('status')
 
   return (
     <div>
@@ -38,6 +40,7 @@ export default function RelatoriosIndex() {
         ))}
       </div>
 
+      {tipo === 'status' && <RelatorioStatusLicitacoes />}
       {tipo === 'ganhos' && <RelatorioGanhos />}
       {tipo === 'itensPerdidos' && <RelatorioItensPerdidos />}
       {tipo === 'desclassificadas' && <RelatorioItensDesclassificados />}
