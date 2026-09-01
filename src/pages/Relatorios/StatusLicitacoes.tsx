@@ -6,22 +6,16 @@ import { DateInputBR } from '../../components/DateTimeBR'
 import { formatFixed } from '../../utils/format'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
+import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
 import StatusBadge from '../../components/StatusBadge'
 
 type Filtro = 'todas' | 'Ganhou' | 'Perdeu' | 'semStatus'
-type FiltroKralen = 'todas' | 'lancadas' | 'naoLancadas'
 
 const FILTROS: { id: Filtro; label: string }[] = [
   { id: 'todas', label: 'Todas' },
   { id: 'Ganhou', label: 'Ganhou' },
   { id: 'Perdeu', label: 'Perdeu' },
   { id: 'semStatus', label: 'Sem status' },
-]
-
-const FILTROS_KRALEN: { id: FiltroKralen; label: string }[] = [
-  { id: 'todas', label: 'Todas' },
-  { id: 'lancadas', label: 'Lançadas no Kralen' },
-  { id: 'naoLancadas', label: 'Não lançadas no Kralen' },
 ]
 
 function contratanteNome(l: any) {
@@ -61,11 +55,7 @@ export default function RelatorioStatusLicitacoes() {
       if (filtro === 'semStatus') return !l.status
       return l.status === filtro
     })
-    .filter(l => {
-      if (filtroKralen === 'todas') return true
-      if (filtroKralen === 'lancadas') return !!l.lancadoNoKralen
-      return !l.lancadoNoKralen
-    })
+    .filter(l => passaFiltroKralen(l.lancadoNoKralen, filtroKralen))
 
   return (
     <div>

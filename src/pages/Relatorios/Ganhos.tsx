@@ -9,6 +9,7 @@ import { agruparPorLote, somaColuna } from '../../utils/itens'
 import { setLancadoNoKralen } from '../../utils/kralen'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
+import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
 
 type LicitacaoGanha = {
   licitacao: any
@@ -63,7 +64,7 @@ export default function RelatorioGanhos() {
   const [loading, setLoading] = useState(true)
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
-  const [filtro, setFiltro] = useState<'naoLancados' | 'todos'>('naoLancados')
+  const [filtro, setFiltro] = useState<FiltroKralen>('naoLancadas')
   const [busca, setBusca] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('todos')
   const [dataInicioCustom, setDataInicioCustom] = useState('')
@@ -99,7 +100,7 @@ export default function RelatorioGanhos() {
       : g
     )
     .filter(g => g.itensVencedores.length > 0)
-    .filter(g => filtro === 'todos' || !g.licitacao.lancadoNoKralen)
+    .filter(g => passaFiltroKralen(g.licitacao.lancadoNoKralen, filtro))
     .filter(g => dataDentroDoPeriodo(g.licitacao.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
 
   const todosItensVencedores = ganhos.flatMap(g => g.itensVencedores)
@@ -109,17 +110,18 @@ export default function RelatorioGanhos() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">Mostrar:</span>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setFiltro('naoLancados')} className={filtro === 'naoLancados' ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}>
-              Não lançados no Kralen
-            </button>
-            <button type="button" onClick={() => setFiltro('todos')} className={filtro === 'todos' ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}>
-              Todos
-            </button>
-          </div>
+      <div className="flex justify-between items-center mb-4 gap-4">
+        <div className="flex items-center gap-2 flex-1 max-w-sm">
+          <input
+            type="text"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar item ganho por nome/descrição..."
+            className="w-full p-2 rounded text-sm"
+          />
+          {busca && (
+            <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
+          )}
         </div>
         <button
           onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_ganhos.pdf', 'Relatório Geral de Itens Ganhos', 'landscape')}
@@ -129,17 +131,20 @@ export default function RelatorioGanhos() {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 mb-4 max-w-sm">
-        <input
-          type="text"
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar item ganho por nome/descrição..."
-          className="w-full p-2 rounded text-sm"
-        />
-        {busca && (
-          <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
-        )}
+      <div className="flex items-center gap-4 mb-4">
+        <span className="text-sm text-gray-600">Kralen:</span>
+        <div className="flex gap-2">
+          {FILTROS_KRALEN.map(f => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltro(f.id)}
+              className={filtro === f.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -203,7 +208,7 @@ export default function RelatorioGanhos() {
           <div className="text-sm text-gray-500">
             {termoBusca
               ? `Nenhum item ganho encontrado com "${busca}".`
-              : filtro === 'naoLancados' ? 'Nenhum ganho pendente de lançamento no Kralen.' : 'Nenhum item vencedor cadastrado ainda.'}
+              : filtro === 'naoLancadas' ? 'Nenhum ganho pendente de lançamento no Kralen.' : 'Nenhum item vencedor cadastrado ainda.'}
           </div>
         ) : (
           <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>

@@ -8,19 +8,12 @@ import { formatNumeric, formatFixed } from '../../utils/format'
 import { agruparPorLote, somaColuna } from '../../utils/itens'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
+import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
 
 type LicitacaoDesclassificada = {
   licitacao: any
   itensDesclassificados: any[]
 }
-
-type FiltroKralen = 'todas' | 'lancadas' | 'naoLancadas'
-
-const FILTROS_KRALEN: { id: FiltroKralen; label: string }[] = [
-  { id: 'todas', label: 'Todas' },
-  { id: 'lancadas', label: 'Lançadas no Kralen' },
-  { id: 'naoLancadas', label: 'Não lançadas no Kralen' },
-]
 
 function contratanteNome(l: any) {
   return l.contratante?.nome || l.contratado || l.empresa?.razaoSocial || 'Sem contratante'
@@ -81,11 +74,7 @@ export default function RelatorioItensDesclassificados() {
 
   const desclassificados: LicitacaoDesclassificada[] = licitacoes
     .filter(l => dataDentroDoPeriodo(l.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
-    .filter(l => {
-      if (filtroKralen === 'todas') return true
-      if (filtroKralen === 'lancadas') return !!l.lancadoNoKralen
-      return !l.lancadoNoKralen
-    })
+    .filter(l => passaFiltroKralen(l.lancadoNoKralen, filtroKralen))
     .map(l => ({ licitacao: l, itensDesclassificados: (itemsByCodigo[String(l.codigo)] || []).filter((it: any) => it.desclassificado) }))
     .map(g => termoBusca
       ? { ...g, itensDesclassificados: g.itensDesclassificados.filter((it: any) => (it.descricao || '').toLowerCase().includes(termoBusca)) }
