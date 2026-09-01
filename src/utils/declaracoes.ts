@@ -218,6 +218,15 @@ Por ser expressão de verdade, firmamos o presente.`,
 
 export type DeclaracaoContext = Record<string, string>
 
+// Escolhe qual conta bancária cadastrada usar: a que foi selecionada
+// especificamente pra essa licitação (licitacao.bancoId) ou, se nenhuma foi
+// escolhida ainda, a primeira da lista.
+export function bancoDaLicitacao(empresa: any, licitacao: any): { id: string; apelido: string; banco: string; agencia: string; conta: string } | null {
+  const bancos: any[] = empresa?.bancos || []
+  if (bancos.length === 0) return null
+  return bancos.find(b => b.id === licitacao?.bancoId) || bancos[0]
+}
+
 export function buildDeclaracaoContext(empresa: any, licitacao: any): DeclaracaoContext {
   empresa = empresa || {}
   licitacao = licitacao || {}
@@ -226,6 +235,7 @@ export function buildDeclaracaoContext(empresa: any, licitacao: any): Declaracao
   const contratanteCompleto = contratanteNome
     ? `PREFEITURA MUNICIPAL DE ${String(contratanteNome).toUpperCase()}${contratanteUf ? '/' + String(contratanteUf).toUpperCase() : ''}`
     : ''
+  const banco = bancoDaLicitacao(empresa, licitacao)
   return {
     razaoSocial: empresa.razaoSocial || '',
     cnpj: empresa.cnpj || '',
@@ -237,9 +247,9 @@ export function buildDeclaracaoContext(empresa: any, licitacao: any): Declaracao
     uf: empresa.uf || '',
     telefone: empresa.telefone || '',
     email: empresa.email || '',
-    banco: empresa.banco || '',
-    agencia: empresa.agencia || '',
-    conta: empresa.conta || '',
+    banco: banco?.banco || '',
+    agencia: banco?.agencia || '',
+    conta: banco?.conta || '',
     representanteNome: empresa.representanteNome || '',
     representanteCargo: empresa.representanteCargo || '',
     representanteCpf: empresa.representanteCpf || '',

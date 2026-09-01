@@ -56,9 +56,11 @@ create table if not exists empresa_info (
   uf text,
   telefone text,
   email text,
-  banco text,
-  agencia text,
-  conta text,
+  -- Lista de contas bancárias: [{ id, apelido, banco, agencia, conta }, ...].
+  -- Substituiu as colunas soltas banco/agencia/conta pra permitir cadastrar
+  -- mais de uma conta e escolher qual usar em cada licitação
+  -- (licitacoes."bancoId" guarda o id da conta escolhida).
+  bancos jsonb not null default '[]',
   "representanteNome" text,
   "representanteCargo" text,
   "representanteCpf" text,
@@ -66,6 +68,10 @@ create table if not exists empresa_info (
   "declaracoesProposta" text,
   updated_at timestamptz not null default now()
 );
+alter table empresa_info add column if not exists bancos jsonb not null default '[]';
+alter table empresa_info drop column if exists banco;
+alter table empresa_info drop column if exists agencia;
+alter table empresa_info drop column if exists conta;
 
 -- ============================================================
 -- licitacoes
@@ -95,10 +101,15 @@ create table if not exists licitacoes (
   "vigenciaContrato" text,
   habilitacao jsonb,
   "lancadoNoKralen" boolean not null default false,
+  -- Qual conta bancária (id dentro de empresa_info.bancos) usar nos
+  -- documentos (Proposta/Declarações) desta licitação. Null = usa a
+  -- primeira conta cadastrada.
+  "bancoId" text,
   "criadoPor" text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table licitacoes add column if not exists "bancoId" text;
 
 -- ============================================================
 -- items — uma linha por item de licitação (não mais um array só). É essa

@@ -22,9 +22,6 @@ const REQUIRED_EMPRESA_FIELDS: { key: string; label: string }[] = [
   { key: 'uf', label: 'UF' },
   { key: 'telefone', label: 'Telefone' },
   { key: 'email', label: 'E-mail' },
-  { key: 'banco', label: 'Banco' },
-  { key: 'agencia', label: 'Agência' },
-  { key: 'conta', label: 'Conta' },
   { key: 'representanteNome', label: 'Nome do Representante Legal' },
   { key: 'representanteCargo', label: 'Cargo' },
   { key: 'representanteCpf', label: 'CPF' },
@@ -60,7 +57,8 @@ export default function DeclaracoesSection({ modelo }: { modelo: any }) {
   }, [current])
 
   const camposFaltando = REQUIRED_EMPRESA_FIELDS.filter(f => !empresa?.[f.key])
-  const empresaIncompleta = !empresa || camposFaltando.length > 0
+  const semContaBancaria = !empresa?.bancos || empresa.bancos.length === 0
+  const empresaIncompleta = !empresa || camposFaltando.length > 0 || semContaBancaria
 
   const gerar = (titulo: string, corpoTemplate: string) => {
     const ctx = buildDeclaracaoContext(empresa, modelo)
@@ -87,7 +85,9 @@ export default function DeclaracoesSection({ modelo }: { modelo: any }) {
           ) : (
             <>
               <div>Faltam dados nas <Link to="/empresa" className="link-primary">Informações da Empresa</Link> — as declarações podem sair com lacunas:</div>
-              <div className="mt-1 text-xs text-yellow-800">{camposFaltando.map(f => f.label).join(', ')}</div>
+              <div className="mt-1 text-xs text-yellow-800">
+                {[...camposFaltando.map(f => f.label), ...(semContaBancaria ? ['Conta bancária'] : [])].join(', ')}
+              </div>
             </>
           )}
         </div>

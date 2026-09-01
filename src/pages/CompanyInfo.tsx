@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { getEmpresaInfo, saveEmpresaInfo } from '../utils/empresa'
 import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
 
+type BancoConta = {
+  id: string
+  apelido: string
+  banco: string
+  agencia: string
+  conta: string
+}
+
 type EmpresaInfo = {
   razaoSocial: string
   cnpj: string
@@ -13,9 +21,7 @@ type EmpresaInfo = {
   uf: string
   telefone: string
   email: string
-  banco: string
-  agencia: string
-  conta: string
+  bancos: BancoConta[]
   representanteNome: string
   representanteCargo: string
   representanteCpf: string
@@ -26,9 +32,13 @@ type EmpresaInfo = {
 const empty: EmpresaInfo = {
   razaoSocial: '', cnpj: '', inscricaoEstadual: '', inscricaoMunicipal: '',
   endereco: '', cep: '', cidade: '', uf: '', telefone: '', email: '',
-  banco: '', agencia: '', conta: '',
+  bancos: [],
   representanteNome: '', representanteCargo: '', representanteCpf: '', representanteRg: '',
   declaracoesProposta: ''
+}
+
+function novaConta(): BancoConta {
+  return { id: crypto.randomUUID(), apelido: '', banco: '', agencia: '', conta: '' }
 }
 
 export default function CompanyInfo() {
@@ -40,7 +50,10 @@ export default function CompanyInfo() {
     let mounted = true
     getEmpresaInfo().then((raw) => {
       if (!mounted) return
-      setForm({ ...empty, ...(raw || {}) })
+      // Campos que nunca foram preenchidos voltam `null` do banco — sem isso
+      // o React reclama de input controlado recebendo `null` como value.
+      const semNulos = Object.fromEntries(Object.entries(raw || {}).filter(([, v]) => v !== null))
+      setForm({ ...empty, ...semNulos })
       setLoading(false)
     })
     return () => { mounted = false }
@@ -114,21 +127,86 @@ export default function CompanyInfo() {
         </div>
 
         <div className="mt-6 bg-white border rounded p-4">
-          <h4 className="font-semibold mb-3">Dados Bancários</h4>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="flex justify-between items-center mb-3">
             <div>
-              <label className="block text-sm text-gray-600">Banco</label>
-              <input value={form.banco} onChange={set('banco')} className="w-full p-2 rounded" />
+              <h4 className="font-semibold">Contas Bancárias</h4>
+              <p className="text-sm text-gray-500">Cadastre quantas contas precisar — na licitação você escolhe qual delas entra na Proposta e nas Declarações.</p>
             </div>
-            <div>
-              <label className="block text-sm text-gray-600">Agência</label>
-              <input value={form.agencia} onChange={set('agencia')} className="w-full p-2 rounded" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600">Conta</label>
-              <input value={form.conta} onChange={set('conta')} className="w-full p-2 rounded" />
-            </div>
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, bancos: [...f.bancos, novaConta()] }))}
+              className="btn btn-ghost text-sm"
+            >
+              + Adicionar conta
+            </button>
           </div>
+
+          {form.bancos.length === 0 ? (
+            <p className="text-sm text-gray-500">Nenhuma conta cadastrada ainda.</p>
+          ) : (
+            <div className="space-y-3">
+              {form.bancos.map((conta, idx) => (
+                <div key={conta.id} className="grid grid-cols-4 gap-3 items-end border-t pt-3 first:border-t-0 first:pt-0">
+                  <div>
+                    <label className="block text-sm text-gray-600">Apelido</label>
+                    <input
+                      value={conta.apelido}
+                      placeholder="ex.: Conta principal"
+                      onChange={e => setForm(f => {
+                        const bancos = [...f.bancos]; bancos[idx] = { ...bancos[idx], apelido: e.target.value }
+                        return { ...f, bancos }
+                      })}
+                      className="w-full p-2 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600">Banco</label>
+                    <input
+                      value={conta.banco}
+                      onChange={e => setForm(f => {
+                        const bancos = [...f.bancos]; bancos[idx] = { ...bancos[idx], banco: e.target.value }
+                        return { ...f, bancos }
+                      })}
+                      className="w-full p-2 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600">Agência</label>
+                    <input
+                      value={conta.agencia}
+                      onChange={e => setForm(f => {
+                        const bancos = [...f.bancos]; bancos[idx] = { ...bancos[idx], agencia: e.target.value }
+                        return { ...f, bancos }
+                      })}
+                      className="w-full p-2 rounded"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="block text-sm text-gray-600">Conta</label>
+                      <input
+                        value={conta.conta}
+                        onChange={e => setForm(f => {
+                          const bancos = [...f.bancos]; bancos[idx] = { ...bancos[idx], conta: e.target.value }
+                          return { ...f, bancos }
+                        })}
+                        className="w-full p-2 rounded"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, bancos: f.bancos.filter((_, i) => i !== idx) }))}
+                      className="btn btn-ghost text-sm"
+                      style={{ color: 'var(--color-error)' }}
+                      title="Remover conta"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-6 bg-white border rounded p-4">

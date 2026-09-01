@@ -10,7 +10,7 @@ import DeclaracoesSection from '../../components/DeclaracoesSection'
 import PrintableChecklist from '../../components/PrintableChecklist'
 import PrintableProposta from '../../components/PrintableProposta'
 import { setLancadoNoKralen } from '../../utils/kralen'
-import { getLicitacao } from '../../utils/licitacoes'
+import { getLicitacao, updateLicitacao } from '../../utils/licitacoes'
 import { listItems, updateItem } from '../../utils/items'
 import { listAttachments } from '../../utils/attachments'
 import { listAtas, addAta, removeAta as removeAtaApi } from '../../utils/atas'
@@ -123,6 +123,11 @@ export default function DetailLicitacao() {
     const list = await removeAtaApi(id, codigo!)
     setAtas(list)
   }
+  const trocarBanco = async (bancoId: string) => {
+    const atualizado = await updateLicitacao(model.codigo, { bancoId: bancoId || null })
+    setModel(atualizado)
+  }
+
   const toggleKralen = async (checked: boolean) => {
     const userName = localStorage.getItem('user_name') || undefined
     const list = await setLancadoNoKralen(model.codigo, checked, userName)
@@ -645,6 +650,21 @@ export default function DetailLicitacao() {
           </ul>
         )}
       </div>
+
+      {empresa?.bancos?.length > 1 && (
+        <div className="mt-6 flex items-center gap-2">
+          <label className="text-sm text-gray-600">Conta bancária desta licitação (usada na Proposta e nas Declarações):</label>
+          <select
+            value={model.bancoId || empresa.bancos[0]?.id || ''}
+            onChange={e => trocarBanco(e.target.value)}
+            className="p-1.5 rounded text-sm"
+          >
+            {empresa.bancos.map((b: any) => (
+              <option key={b.id} value={b.id}>{b.apelido || b.banco || 'Conta sem apelido'}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="mt-6 flex gap-2">
         <button onClick={() => {
