@@ -2,15 +2,25 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listLicitacoes } from '../../utils/licitacoes'
 import { listItems } from '../../utils/items'
-import { formatDateTimeBR } from '../../utils/date'
+import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
+import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed } from '../../utils/format'
 import { agruparPorLote, somaColuna } from '../../utils/itens'
 import { exportElementsToPdf } from '../../utils/pdf'
+import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 
 type LicitacaoPerdida = {
   licitacao: any
   itensPerdidos: any[]
 }
+
+type FiltroKralen = 'todas' | 'lancadas' | 'naoLancadas'
+
+const FILTROS_KRALEN: { id: FiltroKralen; label: string }[] = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'lancadas', label: 'Lançadas no Kralen' },
+  { id: 'naoLancadas', label: 'Não lançadas no Kralen' },
+]
 
 function contratanteNome(l: any) {
   return l.contratante?.nome || l.contratado || l.empresa?.razaoSocial || 'Sem contratante'
@@ -54,7 +64,12 @@ export default function RelatorioItensPerdidos() {
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
   const [busca, setBusca] = useState('')
+  const [filtroKralen, setFiltroKralen] = useState<FiltroKralen>('todas')
+  const [periodo, setPeriodo] = useState<Periodo>('todos')
+  const [dataInicioCustom, setDataInicioCustom] = useState('')
+  const [dataFimCustom, setDataFimCustom] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const hoje = nowInBrasilia().date
 
   useEffect(() => {
     const load = async () => {
@@ -73,6 +88,12 @@ export default function RelatorioItensPerdidos() {
   const termoBusca = busca.trim().toLowerCase()
 
   const perdidos: LicitacaoPerdida[] = licitacoes
+    .filter(l => dataDentroDoPeriodo(l.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
+    .filter(l => {
+      if (filtroKralen === 'todas') return true
+      if (filtroKralen === 'lancadas') return !!l.lancadoNoKralen
+      return !l.lancadoNoKralen
+    })
     .map(l => {
       const items = itemsByCodigo[String(l.codigo)] || []
       if (!licitacaoDecidida(l, items)) return { licitacao: l, itensPerdidos: [] }
@@ -109,8 +130,52 @@ export default function RelatorioItensPerdidos() {
         </button>
       </div>
 
+      <div className="flex items-center gap-4 mb-4">
+        <span className="text-sm text-gray-600">Kralen:</span>
+        <div className="flex gap-2">
+          {FILTROS_KRALEN.map(f => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltroKralen(f.id)}
+              className={filtroKralen === f.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 mb-4">
+        <span className="text-sm text-gray-600">Período:</span>
+        <div className="flex flex-wrap gap-2">
+          {PERIODOS.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPeriodo(p.id)}
+              className={periodo === p.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {periodo === 'custom' && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-600">De</span>
+            <DateInputBR value={dataInicioCustom} onChange={setDataInicioCustom} className="p-1.5 rounded w-32" />
+            <span className="text-gray-600">até</span>
+            <DateInputBR value={dataFimCustom} onChange={setDataFimCustom} className="p-1.5 rounded w-32" />
+          </div>
+        )}
+      </div>
+
       <div ref={containerRef} className="bg-white p-4 rounded shadow overflow-x-auto">
-        <h3 className="text-xl font-bold text-center mb-4">Relatório Geral de Itens Perdidos</h3>
+        <h3 className="text-xl font-bold text-center mb-1">Relatório Geral de Itens Perdidos</h3>
+        <div className="text-center text-xs text-gray-500 mb-4">
+          {PERIODOS.find(p => p.id === periodo)?.label}
+          {periodo === 'custom' && (dataInicioCustom || dataFimCustom) ? ` (${dataInicioCustom ? formatDateTimeBR(dataInicioCustom) : '…'} até ${dataFimCustom ? formatDateTimeBR(dataFimCustom) : 'hoje'})` : ''}
+        </div>
         {termoBusca && (
           <div className="text-center text-xs text-gray-500 mb-4">
             Filtrando por: <strong>{busca}</strong> — {perdidos.length} licitação(ões) encontrada(s)
