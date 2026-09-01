@@ -123,9 +123,39 @@ export default function DetailLicitacao() {
     const list = await removeAtaApi(id, codigo!)
     setAtas(list)
   }
-  const trocarBanco = async (bancoId: string) => {
-    const atualizado = await updateLicitacao(model.codigo, { bancoId: bancoId || null })
-    setModel(atualizado)
+  const [showPropostaModal, setShowPropostaModal] = useState(false)
+  const [bancoProposta, setBancoProposta] = useState('')
+
+  const gerarPropostaPdf = async (bancoId?: string) => {
+    if (!propostaRef.current) return
+    await exportElementsToPdf([propostaRef.current], `proposta_${model.codigo}.pdf`, 'Proposta de Preços')
+    try {
+      const userName = localStorage.getItem('user_name') || undefined
+      await auditLog('proposta_emitida', { codigo: model.codigo, bancoId: bancoId ?? model.bancoId }, userName)
+    } catch (err) { /* ignore */ }
+  }
+
+  // Com mais de uma conta cadastrada, pergunta qual entra na proposta antes de
+  // gerar o PDF; com uma só (ou nenhuma) não há o que escolher, gera direto.
+  const emitirProposta = async () => {
+    const bancos = empresa?.bancos || []
+    if (bancos.length <= 1) { await gerarPropostaPdf(); return }
+    setBancoProposta(model.bancoId || bancos[0].id)
+    setShowPropostaModal(true)
+  }
+
+  const confirmarEmissaoProposta = async () => {
+    // A conta escolhida fica gravada na licitação: vira o padrão da próxima
+    // emissão e também é a que as declarações usam.
+    if (bancoProposta !== model.bancoId) {
+      const atualizado = await updateLicitacao(model.codigo, { bancoId: bancoProposta || null })
+      setModel(atualizado)
+      // espera o PDF (renderizado fora da tela) se atualizar com a conta nova
+      // antes de virar imagem
+      await new Promise(r => setTimeout(r, 200))
+    }
+    setShowPropostaModal(false)
+    await gerarPropostaPdf(bancoProposta)
   }
 
   const toggleKralen = async (checked: boolean) => {
@@ -651,21 +681,6 @@ export default function DetailLicitacao() {
         )}
       </div>
 
-      {empresa?.bancos?.length > 1 && (
-        <div className="mt-6 flex items-center gap-2">
-          <label className="text-sm text-gray-600">Conta bancária desta licitação (usada na Proposta e nas Declarações):</label>
-          <select
-            value={model.bancoId || empresa.bancos[0]?.id || ''}
-            onChange={e => trocarBanco(e.target.value)}
-            className="p-1.5 rounded text-sm"
-          >
-            {empresa.bancos.map((b: any) => (
-              <option key={b.id} value={b.id}>{b.apelido || b.banco || 'Conta sem apelido'}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className="mt-6 flex gap-2">
         <button onClick={() => {
           if (!printRef.current) return
@@ -675,15 +690,41 @@ export default function DetailLicitacao() {
           if (!itemsRef.current) return
           await exportElementsToPdf([itemsRef.current], `itens_${model.codigo}.pdf`, 'Itens', 'landscape')
         }} className="btn btn-primary">Exportar Itens (PDF)</button>
-        <button onClick={async () => {
-          if (!propostaRef.current) return
-          await exportElementsToPdf([propostaRef.current], `proposta_${model.codigo}.pdf`, 'Proposta de Preços')
-          try {
-            const userName = localStorage.getItem('user_name') || undefined
-            await auditLog('proposta_emitida', { codigo: model.codigo }, userName)
-          } catch (err) { /* ignore */ }
-        }} className="btn btn-primary">Emitir Proposta (PDF)</button>
+        <button onClick={emitirProposta} className="btn btn-primary">Emitir Proposta (PDF)</button>
       </div>
+
+      {showPropostaModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-6 z-50">
+          <div className="bg-white rounded shadow max-w-lg w-full p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="font-semibold">Emitir Proposta — Licitação {model.codigo}</h4>
+              <button onClick={() => setShowPropostaModal(false)} className="text-gray-500">Fechar</button>
+            </div>
+
+            <label className="block text-sm text-gray-600 mb-1">Conta bancária que vai aparecer na proposta</label>
+            <select
+              value={bancoProposta}
+              onChange={e => setBancoProposta(e.target.value)}
+              className="w-full p-2 rounded"
+              autoFocus
+            >
+              {(empresa?.bancos || []).map((b: any) => (
+                <option key={b.id} value={b.id}>
+                  {[b.apelido || b.banco || 'Conta sem apelido', b.agencia && `Ag. ${b.agencia}`, b.conta && `C/C ${b.conta}`].filter(Boolean).join(' — ')}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-2">
+              A conta escolhida também passa a ser usada nas declarações desta licitação.
+            </p>
+
+            <div className="mt-4 flex gap-2">
+              <button onClick={confirmarEmissaoProposta} className="btn btn-primary">Gerar PDF</button>
+              <button onClick={() => setShowPropostaModal(false)} className="btn btn-ghost">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* hidden printable DOM */}
       <div style={{ position: 'absolute', left: -9999 }} aria-hidden>

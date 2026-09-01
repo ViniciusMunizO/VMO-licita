@@ -141,7 +141,16 @@ async function main() {
 
   const errosAntesProp = erros.length
   await H.clicarPorTexto(page, 'Emitir Proposta (PDF)')
-  await new Promise(r => setTimeout(r, 4000))
+  await new Promise(r => setTimeout(r, 1000))
+  // com mais de uma conta cadastrada, abre o passo de escolha da conta antes
+  const pediuConta = (await H.texto(page)).includes('Conta bancária que vai aparecer na proposta')
+  if (pediuConta) {
+    await page.evaluate(() => {
+      const m = document.querySelector('.fixed.inset-0')
+      Array.from(m.querySelectorAll('button')).find(b => b.textContent.trim() === 'Gerar PDF')?.click()
+    })
+  }
+  await new Promise(r => setTimeout(r, 4500))
   H.check('emitir proposta em PDF não gera erro', erros.length === errosAntesProp, JSON.stringify(erros.slice(errosAntesProp)))
 
   const { data: logs } = await sb.from('audit_logs').select('*').order('at', { ascending: false }).limit(10)

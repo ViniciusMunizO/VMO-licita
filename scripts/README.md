@@ -30,18 +30,20 @@ node scripts/_t4-operacoes-item.js     # vencedor, desclassificação, cálculos
 node scripts/_t5-anexos-atas-empresa.js # anexos, atas, contratantes, empresa/bancos
 node scripts/_t6-relatorios-docs.js    # 4 relatórios, filtros, PDFs, declarações
 node scripts/_t7-seguranca-limites.js  # RLS, privilégios, XSS, casos extremos
+node scripts/_t8-proposta-banco.js     # escolha da conta bancária ao emitir proposta
 ```
 
 Rodar a suíte inteira (bash):
 
 ```bash
 for s in _t1-auth _t2-licitacoes _t3-itens _t4-operacoes-item \
-         _t5-anexos-atas-empresa _t6-relatorios-docs _t7-seguranca-limites; do
+         _t5-anexos-atas-empresa _t6-relatorios-docs _t7-seguranca-limites \
+         _t8-proposta-banco; do
   node scripts/$s.js
 done
 ```
 
-As suítes 3 a 6 dependem da licitação criada pela suíte 2 (o código fica em
+As suítes 3 a 8 dependem da licitação criada pela suíte 2 (o código fica em
 `_codigo-teste.txt`), então rode na ordem.
 
 Para apontar pra produção em vez do dev local: `$env:TEST_BASE="https://..."`.

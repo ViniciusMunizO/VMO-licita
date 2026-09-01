@@ -192,7 +192,7 @@ async function main() {
   it = await itemId('SONDA URETRAL Nº 10')
   H.check('cancelar edição não salva as alterações', Number(it?.valorCusto) === 100, `custo: ${it?.valorCusto}`)
 
-  H.secao('12. Kralen e conta bancária')
+  H.secao('12. Kralen')
   await irParaDetalhe(page)
   const kralenAntes = await page.$eval('input[type="checkbox"]', el => el.checked)
   await page.click('input[type="checkbox"]')
@@ -200,14 +200,8 @@ async function main() {
   const { data: lic } = await sb.from('licitacoes').select('*').eq('codigo', CODIGO).single()
   H.check('checkbox "Lançada no Kralen" grava no banco', lic.lancadoNoKralen === !kralenAntes, `antes: ${kralenAntes}, banco: ${lic.lancadoNoKralen}`)
 
-  const temSelect = await page.$('select')
-  H.check('seletor de conta bancária aparece (há 2 contas cadastradas)', temSelect !== null)
-  if (temSelect) {
-    await page.select('select', 'banco-b')
-    await new Promise(r2 => setTimeout(r2, 1500))
-    const { data: lic2 } = await sb.from('licitacoes').select('bancoId').eq('codigo', CODIGO).single()
-    H.check('escolher a conta bancária grava no banco', lic2.bancoId === 'banco-b', `valor: ${lic2.bancoId}`)
-  }
+  // a escolha da conta bancária agora acontece ao emitir a proposta —
+  // coberta pela suíte _t8-proposta-banco.js
 
   H.secao('13. Auditoria das ações')
   const { data: logs } = await sb.from('audit_logs').select('*').order('at', { ascending: false }).limit(30)
