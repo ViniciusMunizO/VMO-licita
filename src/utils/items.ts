@@ -5,10 +5,15 @@ import { supabase } from './supabaseClient'
 // antes de gravar, senão o Postgres rejeita o insert/update inteiro.
 const NUMERIC_FIELDS = ['quantidade', 'valorCusto', 'totalCusto', 'valorUnitMinimo', 'valorTotalMinimo', 'valorUnitMunicipio', 'valorTotalMunicipio']
 
+// Só mexe em campo que veio no patch: num update parcial (ex.: marcar
+// vencedor, gravar o motivo da desclassificação) os outros campos chegam
+// ausentes, e "ausente" quer dizer "não encoste nessa coluna" — nunca
+// "apague o valor". Converter ausente em null aqui apagava quantidade,
+// custo e totais do item a cada clique em Venceu/Desclassificar.
 function sanitizeItem(item: any) {
   const out = { ...item }
   for (const f of NUMERIC_FIELDS) {
-    if (out[f] === '' || out[f] === undefined) out[f] = null
+    if (f in out && out[f] === '') out[f] = null
   }
   return out
 }

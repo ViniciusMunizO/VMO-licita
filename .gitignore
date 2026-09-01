@@ -1,3 +1,8 @@
 node_modules
 dist
 .env
+
+# artefatos gerados pela suíte de testes (scripts/README.md)
+scripts/_p-*.xlsx
+scripts/_codigo-teste.txt
+scripts/_anexo-teste.txt
