@@ -4,60 +4,65 @@ import { listItems, replaceItems } from '../utils/items'
 
 // Planilha "02. MODELO DE COTAÇÃO": tem um bloco de cabeçalho do pregão (linhas
 // 1-6, tamanho pode variar um pouco de arquivo pra arquivo) antes da tabela de
-// itens em si. Por isso a leitura não assume um número fixo de linha pro
-// cabeçalho da tabela — ela procura a célula "COD. KRALEN" nas primeiras
-// linhas e só então lê os itens a partir da linha seguinte.
+// itens em si. Por isso a leitura não assume um número fixo de linha nem de
+// coluna pro cabeçalho da tabela — ela procura a célula "COD. KRALEN" nas
+// primeiras linhas (em qualquer coluna) e usa a posição encontrada como
+// âncora: todo o resto é lido em colunas relativas a ela (COL_OFFSET), nunca
+// por índice absoluto. Isso evita quebrar quando o arquivo tem uma coluna a
+// mais/a menos no início (ex.: a coluna A, normalmente vazia no modelo,
+// ganhar alguma formatação e passar a "contar" como coluna usada da planilha
+// — foi exatamente isso que aconteceu num arquivo real de cliente).
 //
-// A partir daí a leitura é posicional (por índice de coluna), pulando as
-// colunas ocultas de % (ficam "escondidas" dentro do cabeçalho mesclado de
-// Valor Mínimo/Município, só ajudam quem preenche a planilha a calcular a
-// margem, não guardamos elas) e parando no primeiro item sem descrição — o
-// restante da planilha vem com linhas em branco do modelo, prontas pra uso
-// futuro.
-//
-// Os índices de COL são relativos ao array que `sheet_to_json` devolve, que
-// começa na primeira coluna USADA da planilha (aqui, a coluna B do Excel —
-// a coluna A fica sempre em branco no modelo), não necessariamente na coluna
-// A. `validarCabecalho` confere se essa suposição continua batendo antes de
-// importar qualquer coisa — se o layout mudar, o import é bloqueado com um
-// erro em vez de gravar valor errado em coluna errada.
-const COL = {
+// A partir da âncora, a leitura pula as colunas ocultas de % (ficam
+// "escondidas" dentro do cabeçalho mesclado de Valor Mínimo/Município, só
+// ajudam quem preenche a planilha a calcular a margem, não guardamos elas) e
+// para no primeiro item sem descrição — o restante da planilha vem com
+// linhas em branco do modelo, prontas pra uso futuro.
+const COL_OFFSET = {
   codKralen: 0, item: 1, descricao: 2, unidade: 3, quantidade: 4,
   marcaCotacao: 5, origemCotacao: 6, valorUnitMinimo: 7, valorTotalMinimo: 9,
   valorUnitMunicipio: 10, valorTotalMunicipio: 12, valorCusto: 13, totalCusto: 14,
   ganhador: 15, marcaVencedora: 17, valorTotalArrematado: 20,
 } as const
 
+type Coluna = Record<keyof typeof COL_OFFSET, number>
+
 function normalizar(v: any): string {
   return String(v ?? '').trim().toUpperCase()
 }
 
-// Confere se as colunas nas posições esperadas (COL) realmente têm o texto
-// de cabeçalho que a gente espera — se o layout do arquivo mudar (coluna a
-// mais/a menos, ordem diferente), isso pega o desalinhamento na hora, em vez
-// de importar valor errado pra coluna errada silenciosamente.
-const TEXTOS_ESPERADOS: [keyof typeof COL, string][] = [
+// Confere se as colunas nas posições esperadas (relativas à âncora) realmente
+// têm o texto de cabeçalho que a gente espera — se o layout do arquivo mudar
+// de um jeito que a busca pela âncora não cobre (ex.: ordem diferente depois
+// dela), isso pega o desalinhamento na hora, em vez de importar valor errado
+// pra coluna errada silenciosamente.
+const TEXTOS_ESPERADOS: [keyof Coluna, string][] = [
   ['item', 'ITEM'], ['descricao', 'DESCRI'], ['unidade', 'UNID'], ['quantidade', 'QUANT'],
   ['origemCotacao', 'ORIGEM'], ['valorUnitMinimo', 'MINIMO'], ['valorTotalMinimo', 'MINIMO'],
   ['valorUnitMunicipio', 'MUNICIPIO'], ['valorTotalMunicipio', 'MUNICIPIO'],
   ['valorCusto', 'CUSTO'], ['totalCusto', 'CUSTO'], ['ganhador', 'GANHADOR'],
 ]
 
-function validarCabecalho(headerRow: any[]): string[] {
+function validarCabecalho(headerRow: any[], col: Coluna): string[] {
   const problemas: string[] = []
   for (const [campo, esperado] of TEXTOS_ESPERADOS) {
-    const texto = normalizar(headerRow[COL[campo]])
-    if (!texto.includes(esperado)) problemas.push(`coluna "${campo}" esperava conter "${esperado}", achei "${headerRow[COL[campo]] || '(vazio)'}"`)
+    const texto = normalizar(headerRow[col[campo]])
+    if (!texto.includes(esperado)) problemas.push(`coluna "${campo}" esperava conter "${esperado}", achei "${headerRow[col[campo]] || '(vazio)'}"`)
   }
   return problemas
 }
 
-function encontrarLinhaCabecalho(rows: any[][]): number {
-  for (let i = 0; i < Math.min(rows.length, 15); i++) {
-    const celula = normalizar(rows[i]?.[COL.codKralen])
-    if (celula.startsWith('COD') && celula.includes('KRALEN')) return i
+// Procura a célula "COD. KRALEN" em qualquer coluna das primeiras linhas —
+// não assume que ela está sempre na primeira posição do array.
+function encontrarAncora(rows: any[][]): { linha: number; coluna: number } | null {
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const row = rows[i] || []
+    for (let c = 0; c < row.length; c++) {
+      const texto = normalizar(row[c])
+      if (texto.startsWith('COD') && texto.includes('KRALEN')) return { linha: i, coluna: c }
+    }
   }
-  return -1
+  return null
 }
 
 function pareceGanhador(valor: any): boolean {
@@ -66,25 +71,25 @@ function pareceGanhador(valor: any): boolean {
   return ['sim', 's', 'x', '1', 'true', 'ganhou'].includes(texto)
 }
 
-function rowToItem(row: any[]): Record<string, any> {
-  const vencedor = pareceGanhador(row[COL.ganhador])
-  const marcaVencedora = String(row[COL.marcaVencedora] ?? '').trim()
+function rowToItem(row: any[], col: Coluna): Record<string, any> {
+  const vencedor = pareceGanhador(row[col.ganhador])
+  const marcaVencedora = String(row[col.marcaVencedora] ?? '').trim()
   return {
-    codKralen: row[COL.codKralen] ?? '',
-    item: row[COL.item] ?? '',
-    descricao: row[COL.descricao] ?? '',
-    unidade: row[COL.unidade] ?? '',
-    quantidade: row[COL.quantidade] ?? '',
-    marca: marcaVencedora || (row[COL.marcaCotacao] ?? ''),
-    origemCotacao: row[COL.origemCotacao] ?? '',
-    valorUnitMinimo: row[COL.valorUnitMinimo] ?? '',
-    valorTotalMinimo: row[COL.valorTotalMinimo] ?? '',
-    valorUnitMunicipio: row[COL.valorUnitMunicipio] ?? '',
-    valorTotalMunicipio: row[COL.valorTotalMunicipio] ?? '',
-    valorCusto: row[COL.valorCusto] ?? '',
-    totalCusto: row[COL.totalCusto] ?? '',
+    codKralen: row[col.codKralen] ?? '',
+    item: row[col.item] ?? '',
+    descricao: row[col.descricao] ?? '',
+    unidade: row[col.unidade] ?? '',
+    quantidade: row[col.quantidade] ?? '',
+    marca: marcaVencedora || (row[col.marcaCotacao] ?? ''),
+    origemCotacao: row[col.origemCotacao] ?? '',
+    valorUnitMinimo: row[col.valorUnitMinimo] ?? '',
+    valorTotalMinimo: row[col.valorTotalMinimo] ?? '',
+    valorUnitMunicipio: row[col.valorUnitMunicipio] ?? '',
+    valorTotalMunicipio: row[col.valorTotalMunicipio] ?? '',
+    valorCusto: row[col.valorCusto] ?? '',
+    totalCusto: row[col.totalCusto] ?? '',
     vencedor,
-    valorGanho: vencedor ? (row[COL.valorTotalArrematado] ?? '') : '',
+    valorGanho: vencedor ? (row[col.valorTotalArrematado] ?? '') : '',
   }
 }
 
@@ -108,19 +113,22 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
       const sheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[sheetName]
       const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-      const headerIdx = encontrarLinhaCabecalho(rows)
-      if (headerIdx === -1) {
+      const ancora = encontrarAncora(rows)
+      if (!ancora) {
         setErro('Não reconheci o modelo dessa planilha — a coluna "COD. KRALEN" não foi encontrada.')
         return
       }
-      const problemas = validarCabecalho(rows[headerIdx])
+      const col = Object.fromEntries(
+        Object.entries(COL_OFFSET).map(([campo, offset]) => [campo, ancora.coluna + offset])
+      ) as Coluna
+      const problemas = validarCabecalho(rows[ancora.linha], col)
       if (problemas.length > 0) {
         setErro('A planilha não bate com o modelo esperado, nada foi importado: ' + problemas.join('; ') + '.')
         return
       }
-      const dataRows = rows.slice(headerIdx + 1)
+      const dataRows = rows.slice(ancora.linha + 1)
       const parsed = dataRows
-        .map(rowToItem)
+        .map(row => rowToItem(row, col))
         .filter(it => String(it.descricao || '').trim() !== '')
       const saved = await replaceItems(codigo, parsed)
       setItems(saved)
