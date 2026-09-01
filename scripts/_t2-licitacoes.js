@@ -6,6 +6,10 @@ async function main() {
   const sb = await H.supabaseLogado()
   let codigoNovo = null
 
+  // remove sobras de execuções anteriores pra a contagem ser determinística
+  const { data: sobras } = await sb.from('licitacoes').select('codigo').eq('numeroPregao', 'TESTE-E2E-001')
+  for (const l of sobras || []) await sb.from('licitacoes').delete().eq('codigo', l.codigo)
+
   H.secao('3. Listagem de licitações')
   await page.goto(`${H.BASE}/licitacoes`, { waitUntil: 'networkidle0' })
   await new Promise(r => setTimeout(r, 1500))

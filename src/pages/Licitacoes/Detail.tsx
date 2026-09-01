@@ -74,6 +74,10 @@ export default function DetailLicitacao() {
   const [items, setItems] = useState<any[]>([])
   const [atas, setAtas] = useState<Ata[]>([])
   const [empresa, setEmpresa] = useState<any>(null)
+  // Itens/anexos/atas/empresa chegam depois da licitação. Sem essa flag dava
+  // pra clicar em "Emitir Proposta" nesse intervalo e sair um PDF sem CNPJ,
+  // endereço nem conta bancária — e sem sequer perguntar qual conta usar.
+  const [carregandoDados, setCarregandoDados] = useState(true)
   const printRef = useRef<HTMLDivElement | null>(null)
   const itemsRef = useRef<HTMLDivElement | null>(null)
   const propostaRef = useRef<HTMLDivElement | null>(null)
@@ -100,6 +104,8 @@ export default function DetailLicitacao() {
         }
       } catch (err) {
         // ignore
+      } finally {
+        if (mounted) setCarregandoDados(false)
       }
     }
     load()
@@ -681,16 +687,17 @@ export default function DetailLicitacao() {
         )}
       </div>
 
-      <div className="mt-6 flex gap-2">
-        <button onClick={() => {
+      <div className="mt-6 flex gap-2 items-center">
+        <button disabled={carregandoDados} onClick={() => {
           if (!printRef.current) return
           printElement(printRef.current, `Checklist — Licitação ${model.codigo}`)
-        }} className="btn btn-primary">Imprimir Checklist</button>
-        <button onClick={async () => {
+        }} className="btn btn-primary disabled:opacity-50">Imprimir Checklist</button>
+        <button disabled={carregandoDados} onClick={async () => {
           if (!itemsRef.current) return
           await exportElementsToPdf([itemsRef.current], `itens_${model.codigo}.pdf`, 'Itens', 'landscape')
-        }} className="btn btn-primary">Exportar Itens (PDF)</button>
-        <button onClick={emitirProposta} className="btn btn-primary">Emitir Proposta (PDF)</button>
+        }} className="btn btn-primary disabled:opacity-50">Exportar Itens (PDF)</button>
+        <button disabled={carregandoDados} onClick={emitirProposta} className="btn btn-primary disabled:opacity-50">Emitir Proposta (PDF)</button>
+        {carregandoDados && <span className="text-sm text-gray-500">Carregando dados...</span>}
       </div>
 
       {showPropostaModal && (

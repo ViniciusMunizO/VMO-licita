@@ -3,6 +3,10 @@ const path = require('path')
 const H = require('./_harness')
 
 const CODIGO = Number(fs.readFileSync(__dirname + '/_codigo-teste.txt', 'utf8').trim())
+if (!CODIGO) {
+  console.error('Sem licitação de teste válida. Rode scripts/_t2-licitacoes.js antes desta suíte.')
+  process.exit(1)
+}
 
 async function importar(page, arquivo) {
   await page.goto(`${H.BASE}/licitacoes/novo?edit=${CODIGO}`, { waitUntil: 'networkidle0' })

@@ -2,6 +2,10 @@ const fs = require('fs')
 const H = require('./_harness')
 
 const CODIGO = Number(fs.readFileSync(__dirname + '/_codigo-teste.txt', 'utf8').trim())
+if (!CODIGO) {
+  console.error('Sem licitação de teste válida. Rode scripts/_t2-licitacoes.js antes desta suíte.')
+  process.exit(1)
+}
 
 async function irParaDetalhe(page) {
   await page.goto(`${H.BASE}/licitacoes/${CODIGO}`, { waitUntil: 'networkidle0' })

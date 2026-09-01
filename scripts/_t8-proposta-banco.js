@@ -2,6 +2,10 @@ const fs = require('fs')
 const H = require('./_harness')
 
 const CODIGO = Number(fs.readFileSync(__dirname + '/_codigo-teste.txt', 'utf8').trim())
+if (!CODIGO) {
+  console.error('Sem licitação de teste válida. Rode scripts/_t2-licitacoes.js antes desta suíte.')
+  process.exit(1)
+}
 
 async function main() {
   const { browser, page, erros } = await H.novoBrowser()
@@ -92,7 +96,36 @@ async function main() {
     textoDecl.includes(escolhida.banco) || textoDecl.includes(escolhida.conta),
     `procurando "${escolhida.banco}"`)
 
-  H.secao('36. Comportamento com uma única conta cadastrada')
+  H.secao('36. Clique imediato após abrir a página (corrida de carregamento)')
+  // sem esperar nada: os botões de documento não podem gerar PDF antes dos
+  // dados da empresa chegarem, senão sai proposta sem CNPJ/endereço/banco
+  await page.goto(`${H.BASE}/licitacoes/${CODIGO}`, { waitUntil: 'domcontentloaded' })
+  const estadoImediato = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Emitir Proposta (PDF)')
+    return btn ? { existe: true, desabilitado: btn.disabled } : { existe: false }
+  })
+  H.check('botão de emitir proposta fica desabilitado enquanto carrega',
+    !estadoImediato.existe || estadoImediato.desabilitado === true, JSON.stringify(estadoImediato))
+
+  await new Promise(r => setTimeout(r, 2500))
+  const estadoDepois = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Emitir Proposta (PDF)')
+    return btn ? btn.disabled : null
+  })
+  H.check('botão é liberado depois que os dados carregam', estadoDepois === false, `disabled: ${estadoDepois}`)
+
+  // e ao clicar depois de carregado, o passo de escolha aparece normalmente
+  await H.clicarPorTexto(page, 'Emitir Proposta (PDF)')
+  await new Promise(r => setTimeout(r, 900))
+  H.check('após carregar, o passo de escolha da conta abre normalmente',
+    (await H.texto(page)).includes('Conta bancária que vai aparecer na proposta'))
+  await page.evaluate(() => {
+    const m = document.querySelector('.fixed.inset-0')
+    Array.from(m.querySelectorAll('button')).find(b => b.textContent.trim() === 'Cancelar')?.click()
+  })
+  await new Promise(r => setTimeout(r, 500))
+
+  H.secao('37. Comportamento com uma única conta cadastrada')
   // deixa só uma conta temporariamente
   await sb.from('empresa_info').update({ bancos: [bancos[0]] }).eq('id', true)
   await page.goto(`${H.BASE}/licitacoes/${CODIGO}`, { waitUntil: 'networkidle0' })
