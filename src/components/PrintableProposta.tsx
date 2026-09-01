@@ -1,7 +1,7 @@
 import React from 'react'
 import { buildDeclaracaoContext } from '../utils/declaracoes'
 import { nowDateExtensoBR } from '../utils/date'
-import { formatNumeric, formatAnvisa } from '../utils/format'
+import { formatNumeric } from '../utils/format'
 import { agruparPorLote, somaColuna } from '../utils/itens'
 import { valorPorExtenso } from '../utils/numeroExtenso'
 import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
@@ -16,24 +16,23 @@ type Props = {
 const row: React.CSSProperties = { marginTop: 4 }
 const PRIMARY = '#0F1B3D'
 
-const PROPOSTA_COLUNAS: { key: string; label: string; width: string; numeric?: boolean; anvisa?: boolean }[] = [
+const PROPOSTA_COLUNAS: { key: string; label: string; width: string; numeric?: boolean }[] = [
   { key: 'item', label: 'Item', width: '6%' },
   { key: 'marca', label: 'Marca', width: '12%' },
   { key: 'descricao', label: 'Descrição', width: '38%' },
   { key: 'quantidade', label: 'Qtd', width: '8%', numeric: true },
   { key: 'unidade', label: 'Uni', width: '8%' },
-  { key: 'custoUnitario', label: 'Valor Unitário', width: '14%', numeric: true },
-  { key: 'totalCusto', label: 'Valor Total', width: '14%', numeric: true },
+  { key: 'valorUnitMinimo', label: 'Valor Unitário', width: '14%', numeric: true },
+  { key: 'valorTotalMinimo', label: 'Valor Total', width: '14%', numeric: true },
 ]
 
 export default function PrintableProposta({ modelo, items, empresa, pageRef }: Props) {
   const ctx = buildDeclaracaoContext(empresa, modelo)
   const cidadeUf = [ctx.cidade, ctx.uf].filter(Boolean).join('/')
-  const temAnvisa = items.some(it => it.anvisa)
-  const colunas = temAnvisa ? [...PROPOSTA_COLUNAS, { key: 'anvisa', label: 'Nº Anvisa', width: '14%', anvisa: true }] : PROPOSTA_COLUNAS
+  const colunas = PROPOSTA_COLUNAS
   const grupos = agruparPorLote(items)
   const temLotes = grupos.length > 1 || grupos[0]?.lote !== null
-  const valorTotal = somaColuna(items, 'totalCusto')
+  const valorTotal = somaColuna(items, 'valorTotalMinimo')
   const declaracoes = empresa?.declaracoesProposta || DECLARACAO_PROPOSTA_PADRAO
 
   return (
@@ -100,7 +99,7 @@ export default function PrintableProposta({ modelo, items, empresa, pageRef }: P
                       <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f7f7fc' }}>
                         {colunas.map(c => {
                           const value = it[c.key]
-                          const display = c.anvisa ? formatAnvisa(value) : c.numeric ? formatNumeric(value) : (value === undefined || value === '' ? '-' : String(value))
+                          const display = c.numeric ? formatNumeric(value) : (value === undefined || value === '' ? '-' : String(value))
                           return (
                             <td key={c.key} style={{ padding: '6px 6px', borderBottom: '1px solid #eee', textAlign: c.numeric ? 'right' : 'left', verticalAlign: 'top' }}>{display}</td>
                           )
@@ -112,7 +111,7 @@ export default function PrintableProposta({ modelo, items, empresa, pageRef }: P
                     <tfoot>
                       <tr style={{ background: '#f6f6fb' }}>
                         <td colSpan={colunas.length - 1} style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700 }}>Valor Total do Lote:</td>
-                        <td style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700 }}>{formatNumeric(somaColuna(grupo.items, 'totalCusto'))}</td>
+                        <td style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700 }}>{formatNumeric(somaColuna(grupo.items, 'valorTotalMinimo'))}</td>
                       </tr>
                     </tfoot>
                   )}

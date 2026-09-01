@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { formatDateTimeBR, formatDateBR } from '../../utils/date'
-import { formatNumeric, calcCustoUnitario, calcTotalCusto } from '../../utils/format'
+import { formatNumeric, calcTotalCusto, calcValorUnitMinimo, calcValorTotalMinimo, calcValorTotalMunicipio } from '../../utils/format'
 import AttachmentsModal from '../../components/AttachmentsModal'
 import AtaContratoModal, { Ata } from '../../components/AtaContratoModal'
 import DeclaracoesSection from '../../components/DeclaracoesSection'
@@ -51,20 +51,19 @@ function printElement(el: HTMLElement, title: string) {
 const ITEM_FIELDS: { key: string; label: string; wide?: boolean }[] = [
   { key: 'lote', label: 'Lote' },
   { key: 'item', label: 'Item' },
+  { key: 'codKralen', label: 'Cód. Kralen' },
   { key: 'descricao', label: 'Descrição', wide: true },
   { key: 'unidade', label: 'Uni' },
   { key: 'quantidade', label: 'Qtd' },
-  { key: 'valorEdital', label: 'Valor Edital' },
-  { key: 'totalEdital', label: 'Total' },
   { key: 'marca', label: 'Marca' },
-  { key: 'apresentacao', label: 'Apresentação', wide: true },
-  { key: 'anvisa', label: 'Nº Anvisa' },
+  { key: 'origemCotacao', label: 'Origem Cotação', wide: true },
   { key: 'valorCusto', label: 'Valor Custo' },
-  { key: 'tx', label: 'TX' },
-  { key: 'custoUnitario', label: 'Custo + TX (Uni)' },
   { key: 'totalCusto', label: 'Total Custo' },
+  { key: 'valorUnitMinimo', label: 'Valor Unit. Mínimo' },
+  { key: 'valorTotalMinimo', label: 'Valor Total Mínimo' },
+  { key: 'valorUnitMunicipio', label: 'Valor Unit. Município' },
+  { key: 'valorTotalMunicipio', label: 'Valor Total Município' },
   { key: 'status', label: 'Status' },
-  { key: 'custoCaixa', label: 'Custo Caixa' },
 ]
 
 export default function DetailLicitacao() {
@@ -389,16 +388,16 @@ export default function DetailLicitacao() {
                   <th className="p-2">Descrição</th>
                   <th className="p-2">Uni</th>
                   <th className="p-2">Qtd</th>
-                  <th className="p-2">Valor Edital</th>
-                  <th className="p-2">Total</th>
+                  <th className="p-2">Cód. Kralen</th>
                   <th className="p-2">Marca</th>
-                  <th className="p-2">Apresentação</th>
-                  <th className="p-2">Nº Anvisa</th>
+                  <th className="p-2">Origem Cotação</th>
                   <th className="p-2">Valor Custo</th>
-                  <th className="p-2">TX</th>
-                  <th className="p-2">Custo + TX (Uni)</th>
                   <th className="p-2">Total Custo</th>
-                  <th className="p-2">Custo Caixa</th>
+                  <th className="p-2">Valor Mínimo</th>
+                  <th className="p-2">Total Mínimo</th>
+                  <th className="p-2">Valor Município</th>
+                  <th className="p-2">Total Município</th>
+                  <th className="p-2">Status</th>
                   <th className="p-2">Resultado</th>
                   <th className="p-2">Valor Ganho / Motivo</th>
                 </tr>
@@ -423,16 +422,16 @@ export default function DetailLicitacao() {
                         </td>
                         <td className="p-2">{it.unidade || '-'}</td>
                         <td className="p-2">{formatNumeric(it.quantidade ?? it.qty)}</td>
-                        <td className="p-2">{formatNumeric(it.valorEdital)}</td>
-                        <td className="p-2">{formatNumeric(it.totalEdital)}</td>
+                        <td className="p-2">{it.codKralen || '-'}</td>
                         <td className="p-2">{it.marca || '-'}</td>
-                        <td className="p-2">{it.apresentacao || '-'}</td>
-                        <td className="p-2">{it.anvisa || '-'}</td>
+                        <td className="p-2">{it.origemCotacao || '-'}</td>
                         <td className="p-2">{formatNumeric(it.valorCusto)}</td>
-                        <td className="p-2">{formatNumeric(it.tx)}</td>
-                        <td className="p-2">{formatNumeric(it.custoUnitario)}</td>
                         <td className="p-2">{formatNumeric(it.totalCusto)}</td>
-                        <td className="p-2">{formatNumeric(it.custoCaixa)}</td>
+                        <td className="p-2">{formatNumeric(it.valorUnitMinimo)}</td>
+                        <td className="p-2">{formatNumeric(it.valorTotalMinimo)}</td>
+                        <td className="p-2">{formatNumeric(it.valorUnitMunicipio)}</td>
+                        <td className="p-2">{formatNumeric(it.valorTotalMunicipio)}</td>
+                        <td className="p-2">{it.status || '-'}</td>
                         <td className="p-2" onClick={e => e.stopPropagation()}>
                           {it.desclassificado ? (
                             <div className="flex items-center gap-2">
@@ -583,16 +582,23 @@ export default function DetailLicitacao() {
                                         const val = e.target.value
                                         setEditItemDraft((d: any) => {
                                           const next = { ...d, [f.key]: val }
-                                          // Custo + TX (Uni) e Total Custo são recalculados em cascata ao
-                                          // mudar Valor Custo/TX/Qtd, mas continuam campos normais — dá pra
-                                          // sobrescrever manualmente depois.
-                                          if (f.key === 'valorCusto' || f.key === 'tx') {
-                                            const calculado = calcCustoUnitario(next.valorCusto, next.tx)
-                                            if (calculado !== '') next.custoUnitario = calculado
+                                          // Total Custo, Valor Unit. Mínimo (sugerido a partir do Custo +
+                                          // margem padrão) e os totais de Mínimo/Município são recalculados
+                                          // em cascata, mas continuam campos normais — dá pra sobrescrever
+                                          // manualmente depois.
+                                          if (f.key === 'valorCusto' || f.key === 'quantidade') {
+                                            const totalCusto = calcTotalCusto(next.valorCusto, next.quantidade)
+                                            if (totalCusto !== '') next.totalCusto = totalCusto
+                                            const valorUnitMinimo = calcValorUnitMinimo(next.valorCusto)
+                                            if (valorUnitMinimo !== '') next.valorUnitMinimo = valorUnitMinimo
                                           }
-                                          if (f.key === 'valorCusto' || f.key === 'tx' || f.key === 'quantidade' || f.key === 'custoUnitario') {
-                                            const calculadoTotal = calcTotalCusto(next.custoUnitario, next.quantidade)
-                                            if (calculadoTotal !== '') next.totalCusto = calculadoTotal
+                                          if (f.key === 'valorCusto' || f.key === 'quantidade' || f.key === 'valorUnitMinimo') {
+                                            const valorTotalMinimo = calcValorTotalMinimo(next.valorUnitMinimo, next.quantidade)
+                                            if (valorTotalMinimo !== '') next.valorTotalMinimo = valorTotalMinimo
+                                          }
+                                          if (f.key === 'valorUnitMunicipio' || f.key === 'quantidade') {
+                                            const valorTotalMunicipio = calcValorTotalMunicipio(next.valorUnitMunicipio, next.quantidade)
+                                            if (valorTotalMunicipio !== '') next.valorTotalMunicipio = valorTotalMunicipio
                                           }
                                           return next
                                         })

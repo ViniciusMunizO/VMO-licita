@@ -1,43 +1,96 @@
 import React, { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
-import { calcCustoUnitario, calcTotalCusto } from '../utils/format'
 import { listItems, replaceItems } from '../utils/items'
 
-// A planilha de cotação sempre vem no mesmo layout de colunas (A a O), mas o
-// texto do cabeçalho pode se repetir (ex: duas colunas "TOTAL") e o número de
-// linhas preenchidas varia a cada licitação. Por isso a leitura é posicional
-// (por índice de coluna), ignorando o texto do cabeçalho, e para no primeiro
-// item sem descrição — o restante da planilha costuma vir com linhas em
-// branco do modelo.
+// Planilha "02. MODELO DE COTAÇÃO": tem um bloco de cabeçalho do pregão (linhas
+// 1-6, tamanho pode variar um pouco de arquivo pra arquivo) antes da tabela de
+// itens em si. Por isso a leitura não assume um número fixo de linha pro
+// cabeçalho da tabela — ela procura a célula "COD. KRALEN" nas primeiras
+// linhas e só então lê os itens a partir da linha seguinte.
 //
-// Às vezes a planilha vem com uma coluna extra "LOTE" na frente (cada item
-// pertence a um lote diferente). Como isso é opcional e desloca todas as
-// outras colunas em uma posição, a única forma segura de saber se ela está
-// presente é olhar o texto da primeira célula do cabeçalho — é a exceção que
-// confirma a regra da leitura posicional, usada só pra decidir o layout.
-const COLUMNS = [
-  'item', 'descricao', 'unidade', 'quantidade', 'valorEdital', 'totalEdital',
-  'marca', 'apresentacao', 'anvisa', 'valorCusto', 'tx', 'custoUnitario', 'totalCusto',
-  'status', 'custoCaixa',
-] as const
+// A partir daí a leitura é posicional (por índice de coluna), pulando as
+// colunas ocultas de % (ficam "escondidas" dentro do cabeçalho mesclado de
+// Valor Mínimo/Município, só ajudam quem preenche a planilha a calcular a
+// margem, não guardamos elas) e parando no primeiro item sem descrição — o
+// restante da planilha vem com linhas em branco do modelo, prontas pra uso
+// futuro.
+//
+// Os índices de COL são relativos ao array que `sheet_to_json` devolve, que
+// começa na primeira coluna USADA da planilha (aqui, a coluna B do Excel —
+// a coluna A fica sempre em branco no modelo), não necessariamente na coluna
+// A. `validarCabecalho` confere se essa suposição continua batendo antes de
+// importar qualquer coisa — se o layout mudar, o import é bloqueado com um
+// erro em vez de gravar valor errado em coluna errada.
+const COL = {
+  codKralen: 0, item: 1, descricao: 2, unidade: 3, quantidade: 4,
+  marcaCotacao: 5, origemCotacao: 6, valorUnitMinimo: 7, valorTotalMinimo: 9,
+  valorUnitMunicipio: 10, valorTotalMunicipio: 12, valorCusto: 13, totalCusto: 14,
+  ganhador: 15, marcaVencedora: 17, valorTotalArrematado: 20,
+} as const
 
-const COLUMNS_COM_LOTE = ['lote', ...COLUMNS] as const
+function normalizar(v: any): string {
+  return String(v ?? '').trim().toUpperCase()
+}
 
-function rowToItem(row: any[], columns: readonly string[]): Record<string, any> {
-  const item: Record<string, any> = {}
-  columns.forEach((key, idx) => { item[key] = row[idx] ?? '' })
-  // Exceção combinada com o cliente: "custoUnitario" (Custo + TX (Uni)) e
-  // "totalCusto" são recalculados pelo sistema em vez de só transferidos da
-  // planilha — o resto dos campos continua sendo puro transporte de dados.
-  const calculadoCusto = calcCustoUnitario(item.valorCusto, item.tx)
-  if (calculadoCusto !== '') item.custoUnitario = calculadoCusto
-  const calculadoTotal = calcTotalCusto(item.custoUnitario, item.quantidade)
-  if (calculadoTotal !== '') item.totalCusto = calculadoTotal
-  return item
+// Confere se as colunas nas posições esperadas (COL) realmente têm o texto
+// de cabeçalho que a gente espera — se o layout do arquivo mudar (coluna a
+// mais/a menos, ordem diferente), isso pega o desalinhamento na hora, em vez
+// de importar valor errado pra coluna errada silenciosamente.
+const TEXTOS_ESPERADOS: [keyof typeof COL, string][] = [
+  ['item', 'ITEM'], ['descricao', 'DESCRI'], ['unidade', 'UNID'], ['quantidade', 'QUANT'],
+  ['origemCotacao', 'ORIGEM'], ['valorUnitMinimo', 'MINIMO'], ['valorTotalMinimo', 'MINIMO'],
+  ['valorUnitMunicipio', 'MUNICIPIO'], ['valorTotalMunicipio', 'MUNICIPIO'],
+  ['valorCusto', 'CUSTO'], ['totalCusto', 'CUSTO'], ['ganhador', 'GANHADOR'],
+]
+
+function validarCabecalho(headerRow: any[]): string[] {
+  const problemas: string[] = []
+  for (const [campo, esperado] of TEXTOS_ESPERADOS) {
+    const texto = normalizar(headerRow[COL[campo]])
+    if (!texto.includes(esperado)) problemas.push(`coluna "${campo}" esperava conter "${esperado}", achei "${headerRow[COL[campo]] || '(vazio)'}"`)
+  }
+  return problemas
+}
+
+function encontrarLinhaCabecalho(rows: any[][]): number {
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const celula = normalizar(rows[i]?.[COL.codKralen])
+    if (celula.startsWith('COD') && celula.includes('KRALEN')) return i
+  }
+  return -1
+}
+
+function pareceGanhador(valor: any): boolean {
+  if (typeof valor === 'boolean') return valor
+  const texto = String(valor ?? '').trim().toLowerCase()
+  return ['sim', 's', 'x', '1', 'true', 'ganhou'].includes(texto)
+}
+
+function rowToItem(row: any[]): Record<string, any> {
+  const vencedor = pareceGanhador(row[COL.ganhador])
+  const marcaVencedora = String(row[COL.marcaVencedora] ?? '').trim()
+  return {
+    codKralen: row[COL.codKralen] ?? '',
+    item: row[COL.item] ?? '',
+    descricao: row[COL.descricao] ?? '',
+    unidade: row[COL.unidade] ?? '',
+    quantidade: row[COL.quantidade] ?? '',
+    marca: marcaVencedora || (row[COL.marcaCotacao] ?? ''),
+    origemCotacao: row[COL.origemCotacao] ?? '',
+    valorUnitMinimo: row[COL.valorUnitMinimo] ?? '',
+    valorTotalMinimo: row[COL.valorTotalMinimo] ?? '',
+    valorUnitMunicipio: row[COL.valorUnitMunicipio] ?? '',
+    valorTotalMunicipio: row[COL.valorTotalMunicipio] ?? '',
+    valorCusto: row[COL.valorCusto] ?? '',
+    totalCusto: row[COL.totalCusto] ?? '',
+    vencedor,
+    valorGanho: vencedor ? (row[COL.valorTotalArrematado] ?? '') : '',
+  }
 }
 
 export default function ItemsImportModal({ open, onClose, codigo }: { open: boolean; onClose: () => void; codigo: number }) {
   const [items, setItems] = useState<any[]>([])
+  const [erro, setErro] = useState('')
 
   useEffect(() => {
     let mounted = true
@@ -47,6 +100,7 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
 
   const onFile = (f: File | null) => {
     if (!f) return
+    setErro('')
     const reader = new FileReader()
     reader.onload = async (e) => {
       const data = e.target?.result
@@ -54,12 +108,19 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
       const sheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[sheetName]
       const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-      const headerRow = rows[0] || []
-      const temLote = String(headerRow[0] || '').trim().toUpperCase() === 'LOTE'
-      const columns = temLote ? COLUMNS_COM_LOTE : COLUMNS
-      const dataRows = rows.slice(1) // linha 1 é o cabeçalho
+      const headerIdx = encontrarLinhaCabecalho(rows)
+      if (headerIdx === -1) {
+        setErro('Não reconheci o modelo dessa planilha — a coluna "COD. KRALEN" não foi encontrada.')
+        return
+      }
+      const problemas = validarCabecalho(rows[headerIdx])
+      if (problemas.length > 0) {
+        setErro('A planilha não bate com o modelo esperado, nada foi importado: ' + problemas.join('; ') + '.')
+        return
+      }
+      const dataRows = rows.slice(headerIdx + 1)
       const parsed = dataRows
-        .map(row => rowToItem(row, columns))
+        .map(rowToItem)
         .filter(it => String(it.descricao || '').trim() !== '')
       const saved = await replaceItems(codigo, parsed)
       setItems(saved)
@@ -84,11 +145,15 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
           </label>
         </div>
 
+        {erro && <p className="text-sm mt-2" style={{ color: 'var(--color-error)' }}>{erro}</p>}
+
         <div className="mt-4 max-h-64 overflow-auto rounded p-2">
           {items.length === 0 && <p className="text-sm text-gray-500">Nenhum item importado.</p>}
           {items.slice(0, 50).map((it, i) => (
             <div key={i} className="text-sm border-b py-2">
-              <div className="font-medium">{it.lote ? `Lote ${it.lote} — ` : ''}Item {it.item || i + 1} — {it.descricao || '-'}</div>
+              <div className="font-medium">
+                {it.codKralen ? `[${it.codKralen}] ` : ''}{it.lote ? `Lote ${it.lote} — ` : ''}Item {it.item || i + 1} — {it.descricao || '-'}
+              </div>
               <div className="text-xs text-gray-700 mt-1">Uni: {it.unidade || '-'} — Qtd: {it.quantidade || '-'} — Marca: {it.marca || '-'}</div>
             </div>
           ))}

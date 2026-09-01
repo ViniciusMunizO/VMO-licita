@@ -110,19 +110,18 @@ create table if not exists items (
   "licitacaoCodigo" bigint not null references licitacoes(codigo) on delete cascade,
   item text,
   lote text,
+  "codKralen" text,
   descricao text,
   unidade text,
   quantidade numeric,
-  "valorEdital" numeric,
-  "totalEdital" numeric,
   marca text,
-  apresentacao text,
-  anvisa text,
+  "origemCotacao" text,
   "valorCusto" numeric,
-  tx numeric,
-  "custoUnitario" numeric,
   "totalCusto" numeric,
-  "custoCaixa" numeric,
+  "valorUnitMinimo" numeric,
+  "valorTotalMinimo" numeric,
+  "valorUnitMunicipio" numeric,
+  "valorTotalMunicipio" numeric,
   status text,
   vencedor boolean not null default false,
   "valorGanho" text,
@@ -132,6 +131,23 @@ create table if not exists items (
   updated_at timestamptz not null default now()
 );
 create index if not exists items_licitacao_idx on items ("licitacaoCodigo");
+
+-- Migração pra quem já tinha a tabela no modelo antigo de planilha (projeto
+-- já provisionado antes da troca pro "02. MODELO DE COTAÇÃO"): adiciona as
+-- colunas novas e remove as que não existem mais nesse modelo.
+alter table items add column if not exists "codKralen" text;
+alter table items add column if not exists "origemCotacao" text;
+alter table items add column if not exists "valorUnitMinimo" numeric;
+alter table items add column if not exists "valorTotalMinimo" numeric;
+alter table items add column if not exists "valorUnitMunicipio" numeric;
+alter table items add column if not exists "valorTotalMunicipio" numeric;
+alter table items drop column if exists "valorEdital";
+alter table items drop column if exists "totalEdital";
+alter table items drop column if exists apresentacao;
+alter table items drop column if exists anvisa;
+alter table items drop column if exists tx;
+alter table items drop column if exists "custoUnitario";
+alter table items drop column if exists "custoCaixa";
 
 -- ============================================================
 -- attachments

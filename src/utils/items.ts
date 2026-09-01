@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient'
 // Colunas numéricas não aceitam string vazia — a importação de planilha às
 // vezes traz célula vazia como '' em vez de undefined. Convertida pra null
 // antes de gravar, senão o Postgres rejeita o insert/update inteiro.
-const NUMERIC_FIELDS = ['quantidade', 'valorEdital', 'totalEdital', 'valorCusto', 'tx', 'custoUnitario', 'totalCusto', 'custoCaixa']
+const NUMERIC_FIELDS = ['quantidade', 'valorCusto', 'totalCusto', 'valorUnitMinimo', 'valorTotalMinimo', 'valorUnitMunicipio', 'valorTotalMunicipio']
 
 function sanitizeItem(item: any) {
   const out = { ...item }

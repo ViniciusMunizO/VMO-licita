@@ -3,7 +3,7 @@ import { getEmpresaInfo } from '../utils/empresa'
 import { listItems } from '../utils/items'
 import { listAttachments } from '../utils/attachments'
 import { formatDateTimeBR } from '../utils/date'
-import { formatNumeric, formatAnvisa } from '../utils/format'
+import { formatNumeric } from '../utils/format'
 import { agruparPorLote, somaColuna } from '../utils/itens'
 
 type Props = {
@@ -37,22 +37,21 @@ const HABILITACAO_ITEMS: { key: string; label: string }[] = [
   { key: 'cti', label: 'CTI com Transportadora' },
 ]
 
-const ITEM_COLUMNS: { key: string; label: string; width: string; fallback?: string[]; numeric?: boolean; boolean?: boolean; anvisa?: boolean; maxChars?: number }[] = [
+const ITEM_COLUMNS: { key: string; label: string; width: string; fallback?: string[]; numeric?: boolean; boolean?: boolean; maxChars?: number }[] = [
   { key: 'item', label: 'Item', width: '4%' },
-  { key: 'descricao', label: 'Descrição', width: '15%', fallback: ['description'], maxChars: 110 },
-  { key: 'unidade', label: 'Uni', width: '7%' },
+  { key: 'descricao', label: 'Descrição', width: '16%', fallback: ['description'], maxChars: 110 },
+  { key: 'unidade', label: 'Uni', width: '6%' },
   { key: 'quantidade', label: 'Qtd', width: '5%', fallback: ['qty'], numeric: true },
-  { key: 'valorEdital', label: 'Valor Edital', width: '6%', numeric: true },
-  { key: 'totalEdital', label: 'Total', width: '6%', numeric: true },
-  { key: 'marca', label: 'Marca', width: '7%' },
-  { key: 'apresentacao', label: 'Apresentação', width: '6%' },
-  { key: 'anvisa', label: 'Nº Anvisa', width: '9%', anvisa: true },
-  { key: 'valorCusto', label: 'Valor Custo', width: '6%', numeric: true },
-  { key: 'tx', label: 'TX', width: '3%', numeric: true },
-  { key: 'custoUnitario', label: 'Custo + TX (Uni)', width: '6%', numeric: true },
-  { key: 'totalCusto', label: 'Total Custo', width: '6%', numeric: true },
-  { key: 'custoCaixa', label: 'Custo Caixa', width: '6%', numeric: true },
-  { key: 'vencedor', label: 'Vencedor', width: '6%', boolean: true },
+  { key: 'codKralen', label: 'Cód. Kralen', width: '7%' },
+  { key: 'marca', label: 'Marca', width: '8%' },
+  { key: 'origemCotacao', label: 'Origem Cotação', width: '9%' },
+  { key: 'valorCusto', label: 'Valor Custo', width: '7%', numeric: true },
+  { key: 'totalCusto', label: 'Total Custo', width: '7%', numeric: true },
+  { key: 'valorUnitMinimo', label: 'Valor Mínimo', width: '7%', numeric: true },
+  { key: 'valorTotalMinimo', label: 'Total Mínimo', width: '7%', numeric: true },
+  { key: 'valorUnitMunicipio', label: 'Valor Município', width: '7%', numeric: true },
+  { key: 'valorTotalMunicipio', label: 'Total Município', width: '7%', numeric: true },
+  { key: 'vencedor', label: 'Vencedor', width: '5%', boolean: true },
   { key: 'valorGanho', label: 'Valor Ganho', width: '5%' },
 ]
 
@@ -74,8 +73,8 @@ function Box({ title, children }: { title: string; children: React.ReactNode }) 
   )
 }
 
-const TOTAL_EDITAL_INDEX = ITEM_COLUMNS.findIndex(c => c.key === 'totalEdital')
 const TOTAL_CUSTO_INDEX = ITEM_COLUMNS.findIndex(c => c.key === 'totalCusto')
+const COLUNAS_TOTAL = ['totalCusto', 'valorTotalMinimo', 'valorTotalMunicipio']
 
 function ItemsTable({ items, subtotalLabel, subtotalStyle }: { items: any[]; subtotalLabel?: string; subtotalStyle?: React.CSSProperties }) {
   return (
@@ -99,12 +98,10 @@ function ItemsTable({ items, subtotalLabel, subtotalStyle }: { items: any[]; sub
                 if ((value === undefined || value === '') && c.fallback) {
                   for (const f of c.fallback) { if (it[f] !== undefined && it[f] !== '') { value = it[f]; break } }
                 }
-                const isText = c.key === 'descricao' || c.key === 'apresentacao'
+                const isText = c.key === 'descricao' || c.key === 'origemCotacao'
                 let display: string
                 if (c.boolean) {
                   display = value ? 'Vencedor' : '-'
-                } else if (c.anvisa) {
-                  display = formatAnvisa(value)
                 } else if (c.numeric) {
                   display = formatNumeric(value)
                 } else {
@@ -136,11 +133,12 @@ function ItemsTable({ items, subtotalLabel, subtotalStyle }: { items: any[]; sub
         {subtotalLabel && (
           <tfoot>
             <tr style={{ background: BOX_BG }}>
-              <td colSpan={TOTAL_EDITAL_INDEX} style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700, ...subtotalStyle }}>{subtotalLabel}</td>
-              <td style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700, ...subtotalStyle }}>{formatNumeric(somaColuna(items, 'totalEdital'))}</td>
-              <td colSpan={TOTAL_CUSTO_INDEX - TOTAL_EDITAL_INDEX - 1} style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700, ...subtotalStyle }}>Total Custo do Lote:</td>
-              <td style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700, ...subtotalStyle }}>{formatNumeric(somaColuna(items, 'totalCusto'))}</td>
-              <td colSpan={ITEM_COLUMNS.length - TOTAL_CUSTO_INDEX - 1} style={subtotalStyle} />
+              <td colSpan={TOTAL_CUSTO_INDEX} style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700, ...subtotalStyle }}>{subtotalLabel}</td>
+              {ITEM_COLUMNS.slice(TOTAL_CUSTO_INDEX).map(c => (
+                <td key={c.key} style={{ padding: '7px 6px', textAlign: 'right', fontWeight: 700, ...subtotalStyle }}>
+                  {COLUNAS_TOTAL.includes(c.key) ? formatNumeric(somaColuna(items, c.key)) : ''}
+                </td>
+              ))}
             </tr>
           </tfoot>
         )}
@@ -295,8 +293,8 @@ export default function PrintableChecklist({ modelo, codigo, user, habilitacao =
                 {grupos.length > 1 && (
                   <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                     <div style={{ background: PRIMARY, color: '#fff', borderRadius: 6, padding: '8px 16px', fontSize: 11, fontWeight: 700, display: 'flex', gap: 12, alignItems: 'baseline' }}>
-                      <span>Valor Global da Licitação:</span>
-                      <span style={{ fontSize: 13 }}>{formatNumeric(somaColuna(items, 'totalEdital'))}</span>
+                      <span>Valor Global (Mínimo):</span>
+                      <span style={{ fontSize: 13 }}>{formatNumeric(somaColuna(items, 'valorTotalMinimo'))}</span>
                     </div>
                     <div style={{ background: BOX_BG, border: `1px solid ${BOX_BORDER}`, borderRadius: 6, padding: '8px 16px', fontSize: 11, fontWeight: 700, display: 'flex', gap: 12, alignItems: 'baseline' }}>
                       <span>Custo Global:</span>
