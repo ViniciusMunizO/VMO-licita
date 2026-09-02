@@ -22,6 +22,17 @@ function contratanteNome(l: Licitacao) {
   return l.contratante?.nome || l.contratado || l.empresa?.razaoSocial || 'Sem contratante'
 }
 
+// Há quanto tempo a licitação já passou da data, em linguagem do dia a dia —
+// ajuda a priorizar o que está parado há mais tempo.
+function haQuantoTempo(l: Licitacao, agora: number): string {
+  const d = combineDateTime(l.dataLicitacao, l.horaLicitacao)
+  if (!d) return ''
+  const dias = Math.floor((agora - d.getTime()) / (1000 * 60 * 60 * 24))
+  if (dias <= 0) return 'hoje'
+  if (dias === 1) return 'há 1 dia'
+  return `há ${dias} dias`
+}
+
 function StatTile({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="bg-white p-4 rounded shadow">
@@ -92,24 +103,39 @@ export default function Dashboard() {
   const currentYear = new Date().getFullYear()
   const now = Date.now()
 
+  // "Em aberto" = ainda sem resultado lançado. Uma licitação já marcada como
+  // Ganhou/Perdeu está encerrada e não é nem agenda nem pendência.
   const stats = useMemo(() => {
     const thisYear = licitacoes.filter(l => l.ano === currentYear).length
-    const upcoming = licitacoes.filter(l => {
-      const d = combineDateTime(l.dataLicitacao, l.horaLicitacao)
+    const emAberto = licitacoes.filter(l => !l.status)
+    const quando = (l: Licitacao) => combineDateTime(l.dataLicitacao, l.horaLicitacao)
+
+    const proximas = emAberto.filter(l => {
+      const d = quando(l)
       return d !== null && d.getTime() >= now
     })
-    return { total: licitacoes.length, thisYear, upcomingCount: upcoming.length, upcoming }
+    // Já passou da data e ninguém registrou o resultado: enquanto ficar
+    // assim, a licitação não entra nos relatórios de ganhos/perdidos e
+    // distorce a taxa de sucesso, sem nada quebrar pra avisar.
+    const aguardandoResultado = emAberto.filter(l => {
+      const d = quando(l)
+      return d !== null && d.getTime() < now
+    })
+
+    return { total: licitacoes.length, thisYear, proximas, aguardandoResultado }
   }, [licitacoes, currentYear, now])
 
   const byTipoObjeto = useMemo(() => groupCount(licitacoes, l => l.tipoObjeto), [licitacoes])
   const byTipoDisputa = useMemo(() => groupCount(licitacoes, l => l.tipoDisputa), [licitacoes])
 
-  const proximas = useMemo(() => {
-    return stats.upcoming
-      .slice()
-      .sort((a, b) => (combineDateTime(a.dataLicitacao, a.horaLicitacao)?.getTime() || 0) - (combineDateTime(b.dataLicitacao, b.horaLicitacao)?.getTime() || 0))
-      .slice(0, 5)
-  }, [stats.upcoming])
+  const porData = (a: Licitacao, b: Licitacao) =>
+    (combineDateTime(a.dataLicitacao, a.horaLicitacao)?.getTime() || 0) -
+    (combineDateTime(b.dataLicitacao, b.horaLicitacao)?.getTime() || 0)
+
+  // as mais próximas primeiro
+  const proximas = useMemo(() => stats.proximas.slice().sort(porData).slice(0, 5), [stats.proximas])
+  // as mais atrasadas primeiro
+  const aguardando = useMemo(() => stats.aguardandoResultado.slice().sort(porData).slice(0, 5), [stats.aguardandoResultado])
 
   const recentes = useMemo(() => {
     return licitacoes.slice().sort((a, b) => (b.codigo || 0) - (a.codigo || 0)).slice(0, 5)
@@ -138,7 +164,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatTile label="Total de licitações" value={stats.total} />
             <StatTile label={`Cadastradas em ${currentYear}`} value={stats.thisYear} />
-            <StatTile label="Próximas licitações" value={stats.upcomingCount} />
+            <StatTile label="Próximas licitações" value={stats.proximas.length} />
             <StatTile label="Itens cadastrados" value={itemCounts.total} />
           </div>
 
@@ -148,6 +174,50 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white p-4 rounded shadow">
+              <div className="flex items-center gap-2 mb-3">
+                <h4 className="font-semibold">Aguardando resultado</h4>
+                {stats.aguardandoResultado.length > 0 && (
+                  <span
+                    className="text-xs font-semibold text-white px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: 'var(--color-error)' }}
+                  >
+                    {stats.aguardandoResultado.length}
+                  </span>
+                )}
+              </div>
+              {aguardando.length === 0 ? (
+                <div className="text-sm text-gray-500">Nenhuma licitação esperando resultado. Tudo em dia.</div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Já passaram da data e ainda não têm Ganhou/Perdeu — até serem lançadas, ficam fora dos relatórios.
+                  </p>
+                  <ul className="space-y-2">
+                    {aguardando.map((l, i) => (
+                      <li key={`${l.codigo}-${i}`} className="flex justify-between items-center text-sm border-t pt-2 first:border-t-0 first:pt-0">
+                        <div>
+                          <Link to={`/licitacoes/${l.codigo}`} className="link-primary font-medium">{contratanteNome(l)}</Link>
+                          <div className="text-gray-500">Código {l.codigo} • {l.tipoObjeto || 'Sem tipo'}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-gray-600">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</div>
+                          <div className="text-xs font-medium" style={{ color: 'var(--color-error)' }}>
+                            {haQuantoTempo(l, now)}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  {stats.aguardandoResultado.length > aguardando.length && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      + {stats.aguardandoResultado.length - aguardando.length} não exibida(s) aqui.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
             <div className="bg-white p-4 rounded shadow">
               <h4 className="font-semibold mb-3">Próximas licitações</h4>
               {proximas.length === 0 ? (

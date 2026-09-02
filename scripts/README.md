@@ -32,6 +32,7 @@ node scripts/_t6-relatorios-docs.js    # 4 relatórios, filtros, PDFs, declaraç
 node scripts/_t7-seguranca-limites.js  # RLS, privilégios, XSS, casos extremos
 node scripts/_t8-proposta-banco.js     # escolha da conta bancária ao emitir proposta
 node scripts/_t9-pdf-logo.js           # cabeçalho dos PDFs (logo da empresa, sem marca do sistema)
+node scripts/_t10-dashboard.js         # cards do painel (próximas / aguardando resultado)
 ```
 
 Rodar a suíte inteira (bash):
@@ -39,13 +40,14 @@ Rodar a suíte inteira (bash):
 ```bash
 for s in _t1-auth _t2-licitacoes _t3-itens _t4-operacoes-item \
          _t5-anexos-atas-empresa _t6-relatorios-docs _t7-seguranca-limites \
-         _t8-proposta-banco _t9-pdf-logo; do
+         _t8-proposta-banco _t9-pdf-logo _t10-dashboard; do
   node scripts/$s.js
 done
 ```
 
 As suítes 3 a 9 dependem da licitação criada pela suíte 2 (o código fica em
-`_codigo-teste.txt`), então rode na ordem.
+`_codigo-teste.txt`), então rode na ordem. A suíte 10 é independente: cria e
+apaga os próprios dados.
 
 Para apontar pra produção em vez do dev local: `$env:TEST_BASE="https://..."`.
 
