@@ -62,6 +62,14 @@ async function main() {
     H.check(`[${prefixo}] traz o nome do documento no cabeçalho`, conteudo.includes(tituloEsperado), `procurando "${tituloEsperado}"`)
     H.check(`[${prefixo}] tem imagem embutida (a logo)`, conteudo.includes('/XObject'))
     H.check(`[${prefixo}] arquivo tem tamanho plausível`, bytes.length > 20000, `${(bytes.length / 1024).toFixed(0)} KB`)
+
+    // Nenhuma imagem transparente: com transparência, cada visualizador
+    // escolhe contra o que compor (o Chrome usa branco, mas Adobe Reader e o
+    // preview do Windows usam preto) e a logo aparecia dentro de um retângulo
+    // preto. Sem canal alfa, sai igual em qualquer visualizador.
+    H.check(`[${prefixo}] nenhuma imagem com máscara de transparência (/SMask)`, !conteudo.includes('/SMask'),
+      'imagem transparente pode sair com fundo preto dependendo do visualizador')
+    H.check(`[${prefixo}] nenhuma máscara em tons de cinza embutida`, !conteudo.includes('/ColorSpace /DeviceGray'))
   }
 
   const errosReais = erros.filter(e => !e.includes('status of 400'))

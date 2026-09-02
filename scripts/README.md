@@ -54,10 +54,13 @@ Para apontar pra produção em vez do dev local: `$env:TEST_BASE="https://..."`.
 ## Trocar a logo dos PDFs para outro cliente
 
 Os PDFs usam `src/assets/logo-botti.png` (a mesma logo que aparece no topo do
-sistema). Para um cliente novo: substitua esse arquivo pela logo dele e ajuste
-`LOGO_ASPECTO` em [`src/utils/pdf.ts`](../src/utils/pdf.ts) com a proporção
-(largura ÷ altura) da imagem nova. A logo deve ser escura sobre fundo
-transparente — o cabeçalho do PDF é claro.
+sistema). Para um cliente novo, basta substituir esse arquivo pela logo dele —
+a proporção é lida da própria imagem, não precisa ajustar medida nenhuma no
+código. A logo deve ser escura, porque o cabeçalho do PDF é claro.
+
+Se a imagem tiver fundo transparente, tudo bem: antes de entrar no PDF ela é
+desenhada sobre branco e convertida pra JPEG, justamente pra não depender de
+como cada visualizador trata transparência (alguns pintam de preto).
 
 ## Limpeza
 

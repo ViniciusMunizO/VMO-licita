@@ -2,25 +2,44 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import logoUrl from '../assets/logo-botti.png'
 
-// Proporção do arquivo da logo (mesma usada pelo componente Logo na tela).
-// Ao trocar a logo por a de outro cliente, ajustar aqui também.
-const LOGO_ASPECTO = 548 / 171
-
 // A logo entra no PDF como imagem, então precisa virar base64. O arquivo é o
 // mesmo que o Vite já empacota pra tela; carregamos uma vez e reaproveitamos.
-let logoBase64: string | null = null
-async function carregarLogo(): Promise<string | null> {
-  if (logoBase64) return logoBase64
+//
+// A logo original é PNG com fundo transparente, e aí cada visualizador de PDF
+// decide contra o que compor esse transparente — Chrome usa branco, mas
+// Adobe Reader e o preview do Windows usam preto, e a logo saía dentro de um
+// retângulo preto. Por isso ela é desenhada sobre um fundo branco e
+// convertida pra JPEG, que não tem canal alfa: sem transparência, não há o
+// que o visualizador decidir, e o resultado é igual em qualquer um.
+//
+// A proporção vem do próprio arquivo: trocar a logo por a de outro cliente
+// não exige mexer em nenhuma medida aqui.
+let logoCache: { dataUrl: string; aspecto: number } | null = null
+async function carregarLogo(): Promise<{ dataUrl: string; aspecto: number } | null> {
+  if (logoCache) return logoCache
   try {
-    const resposta = await fetch(logoUrl)
-    const blob = await resposta.blob()
-    logoBase64 = await new Promise<string>((resolve, reject) => {
-      const leitor = new FileReader()
-      leitor.onload = () => resolve(String(leitor.result))
-      leitor.onerror = reject
-      leitor.readAsDataURL(blob)
+    const img = new Image()
+    img.src = logoUrl
+    await new Promise((resolve, reject) => {
+      img.onload = resolve
+      img.onerror = reject
     })
-    return logoBase64
+
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0)
+
+    logoCache = {
+      // 0.98: a logo é pequena no papel e tem bordas duras, então vale
+      // gastar bytes pra não aparecer artefato de compressão em volta dela
+      dataUrl: canvas.toDataURL('image/jpeg', 0.98),
+      aspecto: img.naturalWidth / img.naturalHeight,
+    }
+    return logoCache
   } catch (err) {
     // Sem a logo o documento ainda sai — só com o título.
     return null
@@ -71,14 +90,14 @@ export async function exportElementsToPdf(
   // azul-marinho sobre transparente, então sumiria num cabeçalho escuro.
   const logo = await carregarLogo()
   const logoAltura = 28
-  const logoLargura = logoAltura * LOGO_ASPECTO
+  const logoLargura = logo ? logoAltura * logo.aspecto : 0
 
   const drawHeaderFooter = () => {
     pageIndex += 1
     const rgb = hexToRgb(primary)
 
     if (logo) {
-      pdf.addImage(logo, 'PNG', 12, (headerHeight - logoAltura) / 2, logoLargura, logoAltura)
+      pdf.addImage(logo.dataUrl, 'JPEG', 12, (headerHeight - logoAltura) / 2, logoLargura, logoAltura)
     }
 
     pdf.setTextColor(rgb.r, rgb.g, rgb.b)
