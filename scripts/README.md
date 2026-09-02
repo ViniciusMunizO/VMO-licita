@@ -31,6 +31,7 @@ node scripts/_t5-anexos-atas-empresa.js # anexos, atas, contratantes, empresa/ba
 node scripts/_t6-relatorios-docs.js    # 4 relatórios, filtros, PDFs, declarações
 node scripts/_t7-seguranca-limites.js  # RLS, privilégios, XSS, casos extremos
 node scripts/_t8-proposta-banco.js     # escolha da conta bancária ao emitir proposta
+node scripts/_t9-pdf-logo.js           # cabeçalho dos PDFs (logo da empresa, sem marca do sistema)
 ```
 
 Rodar a suíte inteira (bash):
@@ -38,15 +39,23 @@ Rodar a suíte inteira (bash):
 ```bash
 for s in _t1-auth _t2-licitacoes _t3-itens _t4-operacoes-item \
          _t5-anexos-atas-empresa _t6-relatorios-docs _t7-seguranca-limites \
-         _t8-proposta-banco; do
+         _t8-proposta-banco _t9-pdf-logo; do
   node scripts/$s.js
 done
 ```
 
-As suítes 3 a 8 dependem da licitação criada pela suíte 2 (o código fica em
+As suítes 3 a 9 dependem da licitação criada pela suíte 2 (o código fica em
 `_codigo-teste.txt`), então rode na ordem.
 
 Para apontar pra produção em vez do dev local: `$env:TEST_BASE="https://..."`.
+
+## Trocar a logo dos PDFs para outro cliente
+
+Os PDFs usam `src/assets/logo-botti.png` (a mesma logo que aparece no topo do
+sistema). Para um cliente novo: substitua esse arquivo pela logo dele e ajuste
+`LOGO_ASPECTO` em [`src/utils/pdf.ts`](../src/utils/pdf.ts) com a proporção
+(largura ÷ altura) da imagem nova. A logo deve ser escura sobre fundo
+transparente — o cabeçalho do PDF é claro.
 
 ## Limpeza
 

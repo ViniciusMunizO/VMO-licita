@@ -1,5 +1,31 @@
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
+import logoUrl from '../assets/logo-botti.png'
+
+// Proporção do arquivo da logo (mesma usada pelo componente Logo na tela).
+// Ao trocar a logo por a de outro cliente, ajustar aqui também.
+const LOGO_ASPECTO = 548 / 171
+
+// A logo entra no PDF como imagem, então precisa virar base64. O arquivo é o
+// mesmo que o Vite já empacota pra tela; carregamos uma vez e reaproveitamos.
+let logoBase64: string | null = null
+async function carregarLogo(): Promise<string | null> {
+  if (logoBase64) return logoBase64
+  try {
+    const resposta = await fetch(logoUrl)
+    const blob = await resposta.blob()
+    logoBase64 = await new Promise<string>((resolve, reject) => {
+      const leitor = new FileReader()
+      leitor.onload = () => resolve(String(leitor.result))
+      leitor.onerror = reject
+      leitor.readAsDataURL(blob)
+    })
+    return logoBase64
+  } catch (err) {
+    // Sem a logo o documento ainda sai — só com o título.
+    return null
+  }
+}
 
 function hexToRgb(hex: string) {
   const h = hex.replace('#', '')
@@ -40,20 +66,29 @@ export async function exportElementsToPdf(
   let pageIndex = 0
   let firstPage = true
 
+  // O cabeçalho leva a logo da empresa que usa o sistema e o nome do
+  // documento — nada de marca do sistema. Fundo claro de propósito: a logo é
+  // azul-marinho sobre transparente, então sumiria num cabeçalho escuro.
+  const logo = await carregarLogo()
+  const logoAltura = 28
+  const logoLargura = logoAltura * LOGO_ASPECTO
+
   const drawHeaderFooter = () => {
     pageIndex += 1
     const rgb = hexToRgb(primary)
-    pdf.setFillColor(rgb.r, rgb.g, rgb.b)
-    pdf.rect(0, 0, pdfWidth, headerHeight, 'F')
-    const accent = hexToRgb('#EF4136')
-    pdf.setFillColor(accent.r, accent.g, accent.b)
-    pdf.rect(12, 17, 6, 6, 'F')
-    pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(12)
-    pdf.text('Licita-VMO', 24, 28)
-    pdf.setFontSize(10)
-    pdf.setTextColor(240, 240, 240)
-    pdf.text(title, pdfWidth - 12, 28, { align: 'right' })
+
+    if (logo) {
+      pdf.addImage(logo, 'PNG', 12, (headerHeight - logoAltura) / 2, logoLargura, logoAltura)
+    }
+
+    pdf.setTextColor(rgb.r, rgb.g, rgb.b)
+    pdf.setFontSize(11)
+    pdf.text(title, pdfWidth - 12, headerHeight / 2 + 4, { align: 'right' })
+
+    // filete que separa o cabeçalho do conteúdo
+    pdf.setDrawColor(rgb.r, rgb.g, rgb.b)
+    pdf.setLineWidth(1)
+    pdf.line(12, headerHeight, pdfWidth - 12, headerHeight)
 
     pdf.setFillColor(240, 240, 240)
     pdf.rect(0, pdfPageHeight - footerHeight, pdfWidth, footerHeight, 'F')
