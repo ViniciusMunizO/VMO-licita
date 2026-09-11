@@ -143,7 +143,7 @@ export default function RelatorioStatusLicitacoes() {
             <div className="text-xs text-gray-500">Sem status</div>
             <div className="text-lg font-bold text-gray-600">{semStatusCount}</div>
           </div>
-          <div className="bg-indigo-50 border border-indigo-100 rounded p-3 text-center">
+          <div className="bg-cyan-50 border border-cyan-100 rounded p-3 text-center">
             <div className="text-xs text-gray-500">Taxa de sucesso</div>
             <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
               {taxaSucesso === null ? '-' : `${formatFixed(taxaSucesso)}%`}

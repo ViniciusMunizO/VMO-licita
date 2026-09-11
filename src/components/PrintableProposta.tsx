@@ -14,6 +14,9 @@ type Props = {
 }
 
 const row: React.CSSProperties = { marginTop: 4 }
+// Cor dos documentos emitidos: acompanha a logo do CLIENTE, não a paleta do
+// sistema — o papel é dele e vai assinado por ele. Por isso não muda quando a
+// identidade visual do Licita-VMO muda.
 const PRIMARY = '#0F1B3D'
 
 const PROPOSTA_COLUNAS: { key: string; label: string; width: string; numeric?: boolean }[] = [

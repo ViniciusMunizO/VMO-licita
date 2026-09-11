@@ -79,6 +79,9 @@ export async function exportElementsToPdf(
 
   const headerHeight = 44
   const footerHeight = 30
+  // Cor do cabeçalho do documento (título e filete). Acompanha a logo do
+  // CLIENTE, não a paleta do sistema — o documento é dele e vai assinado por
+  // ele. Ao trocar a logo do cliente, ajustar esta cor junto.
   const primary = '#0F1B3D'
   const availableH = pdfPageHeight - headerHeight - footerHeight
 

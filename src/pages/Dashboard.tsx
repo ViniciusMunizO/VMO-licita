@@ -60,7 +60,7 @@ function BarList({ title, data }: { title: string; data: { label: string; count:
               <div className="h-2 rounded bg-gray-100 overflow-hidden">
                 <div
                   className="h-full rounded"
-                  style={{ width: `${(d.count / max) * 100}%`, backgroundColor: 'var(--color-primary)' }}
+                  style={{ width: `${(d.count / max) * 100}%`, backgroundColor: 'var(--color-accent)' }}
                 />
               </div>
             </div>

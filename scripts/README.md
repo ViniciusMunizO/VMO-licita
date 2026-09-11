@@ -82,8 +82,35 @@ Substitua `src/assets/logo-vmo.png` e ajuste a constante `ASPECT` em
 (largura ÷ altura). Para o favicon, substitua também
 `src/assets/logo-vmo-simbolo.png` e rode `node scripts/_gerar-favicon.js`.
 
-As cores da marca ficam em `:root` no [CSS](../src/styles/index.css), nas
-variáveis `--color-marca*` — são elas que pintam a faixa no topo da navbar.
+### Cores
+
+A paleta do sistema sai da própria logo da VMO e fica num lugar só: `:root` no
+[CSS](../src/styles/index.css).
+
+| Variável | Cor | De onde veio |
+|---|---|---|
+| `--color-primary` | `#0d2b30` | o escuro do "VMO" — fundo de botão, item ativo da navbar |
+| `--color-secondary` | `#106069` | tom intermediário derivado — hover e degradê do login |
+| `--color-accent` | `#1396a3` | o turquesa do pentágono — barras do painel, foco de campo |
+| `--color-accent-claro` | `#35d0d3` | o turquesa claro do "M" — ponta do degradê da faixa |
+| `--color-error` | `#EF4136` | **não é marca**: é significado (erro, perigo, desclassificação) |
+
+Trocar a identidade visual é trocar esses quatro primeiros valores — o resto da
+interface acompanha sozinho. O `--color-error` fica onde está: ele diz "deu
+errado", não "somos a VMO".
+
+Duas cores de propósito **não** saem daí:
+
+- o `#0F1B3D` de `PrintableProposta`/`PrintableChecklist`/`PrintableDeclaracao`
+  e de [`utils/pdf.ts`](../src/utils/pdf.ts) acompanha a logo do **cliente**,
+  porque o documento é dele e vai assinado por ele;
+- o verde/vermelho de status (`StatusBadge`) é semântico, igual ao `--color-error`.
+
+Para conferir a paleta a olho depois de mexer nela:
+
+```powershell
+node scripts/_shot-paleta.js   # prints de login, painel e relatórios em scripts/_shots/
+```
 
 ## Limpeza
 

@@ -184,19 +184,19 @@ export default function RelatorioGanhos() {
         )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <div className="bg-indigo-50 border border-indigo-100 rounded p-3 text-center">
+          <div className="bg-cyan-50 border border-cyan-100 rounded p-3 text-center">
             <div className="text-xs text-gray-500">Licitações no período</div>
             <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>{ganhos.length}</div>
           </div>
-          <div className="bg-indigo-50 border border-indigo-100 rounded p-3 text-center">
+          <div className="bg-cyan-50 border border-cyan-100 rounded p-3 text-center">
             <div className="text-xs text-gray-500">Valor Total Ganho</div>
             <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>{formatMoneyBRL(totalGanhoGeral)}</div>
           </div>
-          <div className="bg-indigo-50 border border-indigo-100 rounded p-3 text-center">
+          <div className="bg-cyan-50 border border-cyan-100 rounded p-3 text-center">
             <div className="text-xs text-gray-500">Custo Total</div>
             <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>{formatMoneyBRL(totalCustoGeral)}</div>
           </div>
-          <div className="bg-indigo-50 border border-indigo-100 rounded p-3 text-center">
+          <div className="bg-cyan-50 border border-cyan-100 rounded p-3 text-center">
             <div className="text-xs text-gray-500">Margem</div>
             <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>{margemGeralValor === null ? '-' : `${formatFixed(margemGeralValor)}%`}</div>
           </div>

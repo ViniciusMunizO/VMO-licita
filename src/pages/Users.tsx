@@ -21,7 +21,7 @@ export default function Users() {
     <div>
       <h3 className="text-xl font-semibold mb-4">Usuários</h3>
 
-      <div className="text-sm px-3 py-2 rounded-lg border-l-4 bg-indigo-50 mb-4" style={{ borderColor: 'var(--color-primary)' }}>
+      <div className="text-sm px-3 py-2 rounded-lg border-l-4 bg-cyan-50 mb-4" style={{ borderColor: 'var(--color-primary)' }}>
         Criação de novo usuário é feita direto no painel do Supabase (Authentication → Add user). Depois de criado, o papel dele (Administrador/Moderador/Usuário) pode ser ajustado na tabela <code>profiles</code> — e ele só enxerga o sistema depois que alguém marcar <code>ativo = true</code> na linha dele nessa mesma tabela.
       </div>
 

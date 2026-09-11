@@ -21,6 +21,9 @@ type Props = {
   attachments?: any[]
 }
 
+// Cor dos documentos emitidos: acompanha a logo do CLIENTE, não a paleta do
+// sistema — o papel é dele e vai assinado por ele. Por isso não muda quando a
+// identidade visual do Licita-VMO muda.
 const PRIMARY = '#0F1B3D'
 const BOX_BG = '#f6f6fb'
 const BOX_BORDER = '#e4e4f0'

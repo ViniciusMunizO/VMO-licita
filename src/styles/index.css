@@ -7,19 +7,19 @@ html, body, #root {
 }
 
 :root {
-  --color-primary: #0F1B3D;
-  --color-secondary: #28345C;
-  --color-accent: #EF4136;
+  /* Identidade visual do sistema (VMO Sistemas), tirada da própria logo.
+     `primary` é o escuro do "VMO" e `accent` o turquesa do pentágono; os dois
+     saem direto da imagem. `secondary` é o tom no meio do caminho entre eles,
+     usado em hover e no degradê do login — escuro o bastante pra manter texto
+     branco legível em cima, o que o turquesa puro não garantiria. */
+  --color-primary: #0d2b30;
+  --color-secondary: #106069;
+  --color-accent: #1396a3;
+  --color-accent-claro: #35d0d3;
 
   /* Vermelho por significado (erro, perigo, desclassificação), não por marca —
      por isso não muda quando a identidade visual do sistema muda. */
   --color-error: #EF4136;
-
-  /* Identidade visual do sistema (VMO Sistemas), extraída da própria logo.
-     Usada nas superfícies que representam o sistema, como a faixa do topo. */
-  --color-marca: #1396a3;
-  --color-marca-escuro: #0d2b30;
-  --color-marca-claro: #35d0d3;
 }
 
 /* Base typography and layout polish */
@@ -77,7 +77,8 @@ html, body, #root {
   input[type="text"]:focus, input[type="number"]:focus, input[type="datetime-local"]:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 6px 18px rgba(44,45,125,0.12);
+    /* halo do foco na cor de acento, pra combinar com a borda */
+    box-shadow: 0 6px 18px rgba(19,150,163,0.15);
   }
 }
 

@@ -449,7 +449,7 @@ export default function DetailLicitacao() {
                   return (
                     <React.Fragment key={idx}>
                       <tr
-                        className={`border-t whitespace-nowrap cursor-pointer hover:bg-gray-50 ${isEditing ? 'bg-indigo-50' : ''}`}
+                        className={`border-t whitespace-nowrap cursor-pointer hover:bg-gray-50 ${isEditing ? 'bg-cyan-50' : ''}`}
                         onClick={() => { if (!isEditing) startEditItem(idx) }}
                         title="Clique para editar este item"
                       >
@@ -603,7 +603,7 @@ export default function DetailLicitacao() {
                         </td>
                       </tr>
                       {isEditing && (
-                        <tr className="bg-indigo-50/40 border-t">
+                        <tr className="bg-cyan-50/40 border-t">
                           <td colSpan={hasLotes ? 17 : 16} className="p-4" onClick={e => e.stopPropagation()}>
                             <div className="grid grid-cols-4 gap-3">
                               {ITEM_FIELDS.map(f => (
