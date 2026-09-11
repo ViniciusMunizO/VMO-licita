@@ -85,6 +85,25 @@ async function main() {
     H.check(`rota ${rota} carrega (contém "${esperado}")`, t.includes(esperado), t.slice(0, 80).replace(/\n/g, ' '))
   }
 
+  H.secao('2b. Identidade visual: sistema na interface, cliente nos documentos')
+  await page.goto(`${H.BASE}/login`, { waitUntil: 'networkidle0' })
+  await new Promise(r => setTimeout(r, 900))
+  const logosLogin = await page.$$eval('img', els => els.map(e => e.alt))
+  H.check('tela de login usa a logo do sistema (VMO Sistemas)',
+    logosLogin.some(a => /VMO/i.test(a)), JSON.stringify(logosLogin))
+  H.check('tela de login não usa a logo do cliente',
+    !logosLogin.some(a => /botti/i.test(a)), JSON.stringify(logosLogin))
+
+  await H.login(page)
+  await page.goto(`${H.BASE}/`, { waitUntil: 'networkidle0' })
+  await new Promise(r => setTimeout(r, 1200))
+  const logosApp = await page.$$eval('nav img', els => els.map(e => e.alt))
+  H.check('navbar usa a logo do sistema (VMO Sistemas)',
+    logosApp.some(a => /VMO/i.test(a)), JSON.stringify(logosApp))
+
+  const favicon = await page.$eval('link[rel="icon"]', el => el.getAttribute('href'))
+  H.check('favicon aponta pro ícone do sistema', /favicon\.png/.test(favicon || ''), `href: ${favicon}`)
+
   // links da navbar
   await page.goto(`${H.BASE}/`, { waitUntil: 'networkidle0' })
   const navLinks = await page.$$eval('nav a', els => els.map(e => e.textContent.trim()).filter(Boolean))

@@ -51,16 +51,39 @@ apaga os próprios dados.
 
 Para apontar pra produção em vez do dev local: `$env:TEST_BASE="https://..."`.
 
-## Trocar a logo dos PDFs para outro cliente
+## As duas logos do sistema
 
-Os PDFs usam `src/assets/logo-botti.png` (a mesma logo que aparece no topo do
-sistema). Para um cliente novo, basta substituir esse arquivo pela logo dele —
-a proporção é lida da própria imagem, não precisa ajustar medida nenhuma no
-código. A logo deve ser escura, porque o cabeçalho do PDF é claro.
+São duas, com papéis diferentes — não confundir:
+
+| Arquivo | Aparece em | De quem é |
+|---|---|---|
+| `src/assets/logo-vmo.png` | login, navbar, tela de conta pendente | VMO Sistemas (o sistema) |
+| `src/assets/logo-vmo-simbolo.png` | favicon (via `public/favicon.png`) | VMO Sistemas (o sistema) |
+| `src/assets/logo-botti.png` | cabeçalho dos PDFs emitidos | a empresa que usa o sistema |
+
+A ideia: a interface é o produto da VMO, mas os documentos emitidos são da
+empresa cliente e vão pra mãos de terceiros (órgãos públicos), então levam a
+marca dela.
+
+### Trocar a logo do cliente (a dos PDFs)
+
+Substitua `src/assets/logo-botti.png` pela logo do cliente novo. A proporção é
+lida da própria imagem, não precisa ajustar medida nenhuma no código. A logo
+deve ser escura, porque o cabeçalho do PDF é claro.
 
 Se a imagem tiver fundo transparente, tudo bem: antes de entrar no PDF ela é
 desenhada sobre branco e convertida pra JPEG, justamente pra não depender de
 como cada visualizador trata transparência (alguns pintam de preto).
+
+### Trocar a logo do sistema
+
+Substitua `src/assets/logo-vmo.png` e ajuste a constante `ASPECT` em
+[`src/components/Logo.tsx`](../src/components/Logo.tsx) com a proporção nova
+(largura ÷ altura). Para o favicon, substitua também
+`src/assets/logo-vmo-simbolo.png` e rode `node scripts/_gerar-favicon.js`.
+
+As cores da marca ficam em `:root` no [CSS](../src/styles/index.css), nas
+variáveis `--color-marca*` — são elas que pintam a faixa no topo da navbar.
 
 ## Limpeza
 

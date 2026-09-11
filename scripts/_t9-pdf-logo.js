@@ -61,6 +61,15 @@ async function main() {
     H.check(`[${prefixo}] não contém "Licita VMO" em nenhuma variação`, !/Licita[-\s]?VMO/i.test(conteudo))
     H.check(`[${prefixo}] traz o nome do documento no cabeçalho`, conteudo.includes(tituloEsperado), `procurando "${tituloEsperado}"`)
     H.check(`[${prefixo}] tem imagem embutida (a logo)`, conteudo.includes('/XObject'))
+    // O documento é do cliente, então NÃO pode levar a logo do sistema (VMO).
+    // Checa pelas dimensões da logo do sistema em vez das do cliente de
+    // propósito: assim, trocar a logo do cliente por a de outro cliente (o
+    // procedimento normal, ver README) continua passando, mas importar a logo
+    // errada em pdf.ts falha.
+    const LOGO_SISTEMA = /\/Width\s+1504\s*\/Height\s+607/
+    H.check(`[${prefixo}] não usa a logo do sistema (essa é do cliente)`,
+      !LOGO_SISTEMA.test(conteudo),
+      'o PDF está com a logo da VMO em vez da logo do cliente')
     H.check(`[${prefixo}] arquivo tem tamanho plausível`, bytes.length > 20000, `${(bytes.length / 1024).toFixed(0)} KB`)
 
     // Nenhuma imagem transparente: com transparência, cada visualizador

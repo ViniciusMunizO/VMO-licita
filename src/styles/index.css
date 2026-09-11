@@ -7,11 +7,19 @@ html, body, #root {
 }
 
 :root {
-  /* Identidade visual Botti Global Pharma: navy + vermelho */
   --color-primary: #0F1B3D;
   --color-secondary: #28345C;
   --color-accent: #EF4136;
+
+  /* Vermelho por significado (erro, perigo, desclassificação), não por marca —
+     por isso não muda quando a identidade visual do sistema muda. */
   --color-error: #EF4136;
+
+  /* Identidade visual do sistema (VMO Sistemas), extraída da própria logo.
+     Usada nas superfícies que representam o sistema, como a faixa do topo. */
+  --color-marca: #1396a3;
+  --color-marca-escuro: #0d2b30;
+  --color-marca-claro: #35d0d3;
 }
 
 /* Base typography and layout polish */
