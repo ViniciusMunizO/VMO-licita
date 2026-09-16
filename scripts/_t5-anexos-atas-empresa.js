@@ -34,7 +34,16 @@ async function main() {
   H.check('anexo é gravado no banco', anexos.length === 1, `anexos: ${anexos.length}`)
   H.check('anexo grava o título informado', anexos[0]?.name === 'Edital de Teste E2E', `nome: ${anexos[0]?.name}`)
   H.check('anexo grava o nome do arquivo', anexos[0]?.filename === '_anexo-teste.txt', `arquivo: ${anexos[0]?.filename}`)
-  H.check('anexo grava o conteúdo em base64 (data URI)', String(anexos[0]?.data || '').startsWith('data:'), String(anexos[0]?.data).slice(0, 30))
+
+  // O arquivo agora vai pro bucket "anexos"; a linha guarda só o caminho.
+  const caminho = String(anexos[0]?.path || '')
+  H.check('anexo guarda o caminho no Storage', caminho.startsWith(`licitacoes/${CODIGO}/`), `path: ${caminho || '(vazio)'}`)
+  H.check('anexo não grava mais base64 no banco', anexos[0]?.data == null, `data: ${String(anexos[0]?.data).slice(0, 30)}`)
+  H.check('anexo grava tamanho e tipo', anexos[0]?.size > 0 && !!anexos[0]?.mime, `size: ${anexos[0]?.size}, mime: ${anexos[0]?.mime}`)
+
+  const baixado = await sb.storage.from('anexos').download(caminho)
+  const conteudo = baixado.data ? await baixado.data.text() : ''
+  H.check('arquivo existe no bucket com o conteúdo certo', conteudo === 'conteúdo de teste do anexo E2E', baixado.error?.message || `conteúdo: ${conteudo.slice(0, 40)}`)
 
   t = await H.texto(page)
   H.check('anexo aparece na lista do modal', t.includes('Edital de Teste E2E'))
@@ -51,6 +60,11 @@ async function main() {
   await new Promise(r => setTimeout(r, 1800))
   ;({ data: anexos } = await sb.from('attachments').select('*').eq('licitacaoCodigo', CODIGO))
   H.check('remover anexo apaga do banco', anexos.length === 0, `anexos: ${anexos.length}`)
+
+  // Remover o anexo tem que tirar o arquivo do bucket também — senão cada
+  // remoção deixaria lixo pago e invisível lá dentro.
+  const apos = await sb.storage.from('anexos').download(caminho)
+  H.check('remover anexo apaga o arquivo do bucket', !apos.data || apos.error, apos.error?.message || 'ainda baixa')
   await H.clicarPorTexto(page, 'Fechar')
 
   H.secao('15. Atas / Contratos')

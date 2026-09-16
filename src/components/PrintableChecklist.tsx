@@ -159,12 +159,12 @@ export default function PrintableChecklist({ modelo, codigo, user, habilitacao =
 
   useEffect(() => {
     let mounted = true
-    getEmpresaInfo().then(emp => { if (mounted) setEmpresa(emp || null) })
+    getEmpresaInfo().then(emp => { if (mounted) setEmpresa(emp || null) }).catch(() => { /* cabeçalho sai sem os dados da empresa */ })
     if (itemsProp === undefined) {
-      listItems(codigo).then(it => { if (mounted) setFetchedItems(it || []) })
+      listItems(codigo).then(it => { if (mounted) setFetchedItems(it || []) }).catch(() => { /* impressão segue sem a lista */ })
     }
     if (attachmentsProp === undefined) {
-      listAttachments(codigo).then(at => { if (mounted) setFetchedAttachments(at || []) })
+      listAttachments(codigo).then(at => { if (mounted) setFetchedAttachments(at || []) }).catch(() => { /* impressão segue sem a lista */ })
     }
     return () => { mounted = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps

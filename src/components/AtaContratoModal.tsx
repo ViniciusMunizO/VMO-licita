@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { DateInputBR } from './DateTimeBR'
 import { addMonthsToDate, formatDateBR } from '../utils/date'
+import { formatarTamanho, MAX_ANEXO_BYTES } from '../utils/arquivo'
 
 export type Ata = {
   id: string
@@ -10,7 +11,13 @@ export type Ata = {
   fimVigencia: string
   meses?: number
   observacoes?: string
-  anexo?: { name: string; data: string } | null
+  // Gravado na ata: `path` aponta pro objeto no bucket. `data` (base64) só
+  // aparece nas atas criadas antes da migração pro Storage.
+  anexo?: { name: string; path?: string; data?: string; mime?: string; size?: number } | null
+  // O arquivo escolhido no formulário, ainda não enviado. Quem envia é o
+  // `saveAta` da tela de detalhe, que sabe o código da licitação (e assim um
+  // modal cancelado não deixa arquivo solto no bucket).
+  arquivo?: File | null
   criadoEm: number
   criadoPor?: string
 }
@@ -20,7 +27,10 @@ const TIPOS = ['Ata de Registro de Preços', 'Contrato', 'Aditivo de Prazo', 'Ad
 export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
   open: boolean
   onClose: () => void
-  onSave: (ata: Ata) => void
+  // Devolve a promessa da gravação: o modal só fecha depois que o banco
+  // confirmou. Fechar antes disso era o que fazia uma falha passar
+  // despercebida — a ata sumia da tela como se nunca tivesse sido criada.
+  onSave: (ata: Ata) => Promise<void>
   criadoPor?: string
 }) {
   const [tipo, setTipo] = useState(TIPOS[0])
@@ -29,8 +39,10 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
   const [fimVigencia, setFimVigencia] = useState('')
   const [meses, setMeses] = useState(12)
   const [observacoes, setObservacoes] = useState('')
-  const [anexo, setAnexo] = useState<{ name: string; data: string } | null>(null)
+  const [arquivo, setArquivo] = useState<File | null>(null)
   const [showMesesPopup, setShowMesesPopup] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
 
   if (!open) return null
 
@@ -44,11 +56,18 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
     setShowMesesPopup(false)
   }
 
+  // Só guarda o arquivo escolhido — o envio acontece no Salvar. Antes, aqui
+  // se lia o arquivo inteiro pra base64 de forma assíncrona, e submeter antes
+  // dessa leitura terminar gravava a ata com anexo nulo, sem aviso nenhum.
   const onFile = (f: File | null) => {
     if (!f) return
-    const reader = new FileReader()
-    reader.onload = () => setAnexo({ name: f.name, data: String(reader.result) })
-    reader.readAsDataURL(f)
+    if (f.size > MAX_ANEXO_BYTES) {
+      setArquivo(null)
+      setErro(`O arquivo tem ${formatarTamanho(f.size)} e o limite é ${formatarTamanho(MAX_ANEXO_BYTES)}. Anexe uma versão menor (ou compactada).`)
+      return
+    }
+    setErro('')
+    setArquivo(f)
   }
 
   const reset = () => {
@@ -58,10 +77,11 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
     setFimVigencia('')
     setMeses(12)
     setObservacoes('')
-    setAnexo(null)
+    setArquivo(null)
+    setErro('')
   }
 
-  const save = (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault()
     const ata: Ata = {
       id: String(Date.now()) + Math.random().toString(36).slice(2, 8),
@@ -71,13 +91,21 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
       fimVigencia,
       meses,
       observacoes: observacoes || undefined,
-      anexo,
+      arquivo,
       criadoEm: Date.now(),
       criadoPor,
     }
-    onSave(ata)
-    reset()
-    onClose()
+    setErro('')
+    setSalvando(true)
+    try {
+      await onSave(ata)
+      reset()
+      onClose()
+    } catch (err: any) {
+      setErro(err?.message || 'Não consegui salvar a ata/contrato. Os dados continuam preenchidos, tente de novo.')
+    } finally {
+      setSalvando(false)
+    }
   }
 
   return (
@@ -119,13 +147,25 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
 
           <div>
             <label className="block text-sm text-gray-600 mb-1">Anexo</label>
-            <label className="btn btn-ghost inline-flex items-center gap-2">
-              <input type="file" onChange={e => onFile(e.target.files?.[0] || null)} className="hidden" />
-              {anexo ? anexo.name : 'Selecionar arquivo'}
+            <label className={`btn btn-ghost inline-flex items-center gap-2 ${salvando ? 'opacity-50 pointer-events-none' : ''}`}>
+              <input
+                type="file"
+                disabled={salvando}
+                // Limpar o value deixa o onChange disparar de novo quando o
+                // mesmo arquivo é escolhido duas vezes seguidas.
+                onChange={e => { const f = e.target.files?.[0] || null; e.target.value = ''; void onFile(f) }}
+                className="hidden"
+              />
+              {arquivo ? arquivo.name : 'Selecionar arquivo'}
             </label>
+            <p className="text-xs text-gray-500 mt-1">Tamanho máximo: {formatarTamanho(MAX_ANEXO_BYTES)}.</p>
           </div>
 
-          <button className="btn btn-primary" type="submit">Salvar</button>
+          {erro && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{erro}</p>}
+
+          <button className="btn btn-primary disabled:opacity-50" type="submit" disabled={salvando}>
+            {salvando ? 'Salvando...' : 'Salvar'}
+          </button>
         </form>
       </div>
 

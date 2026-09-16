@@ -1,0 +1,663 @@
+<title>Licita-VMO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,500;0,600;0,700;1,400&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  /* ============ TOKENS ============ */
+  :root{
+    --ink:#0d2b30;
+    --ink-soft:#3f5a5d;
+    --ink-faint:#6d8688;
+    --paper:#f1f6f5;
+    --paper-raised:#ffffff;
+    --paper-sunken:#e7f0ee;
+    --line:#d3e1de;
+    --line-strong:#b7cbc7;
+    --teal-mid:#106069;
+    --teal:#0f7c88;
+    --teal-bright:#1396a3;
+    --teal-glow:#35d0d3;
+    --stamp:#a13228;
+    --good:#1f7a4d;
+    --good-bg:#e4f3ea;
+    --shadow-doc: 0 1px 2px rgba(13,43,48,.06);
+    --shadow-float: 0 18px 40px -18px rgba(13,43,48,.35);
+    --radius-doc: 3px;
+    --radius-card: 10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#eaf4f3;
+      --ink-soft:#a9c4c2;
+      --ink-faint:#7c9997;
+      --paper:#081617;
+      --paper-raised:#0f2427;
+      --paper-sunken:#0a1c1e;
+      --line:#1e3a3c;
+      --line-strong:#2c4d4f;
+      --teal-mid:#3aa4ac;
+      --teal:#35d0d3;
+      --teal-bright:#35d0d3;
+      --teal-glow:#7ceef0;
+      --stamp:#e2685c;
+      --good:#3fcf8e;
+      --good-bg:#0f3327;
+      --shadow-doc: 0 1px 2px rgba(0,0,0,.4);
+      --shadow-float: 0 18px 44px -18px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#eaf4f3;
+    --ink-soft:#a9c4c2;
+    --ink-faint:#7c9997;
+    --paper:#081617;
+    --paper-raised:#0f2427;
+    --paper-sunken:#0a1c1e;
+    --line:#1e3a3c;
+    --line-strong:#2c4d4f;
+    --teal-mid:#3aa4ac;
+    --teal:#35d0d3;
+    --teal-bright:#35d0d3;
+    --teal-glow:#7ceef0;
+    --stamp:#e2685c;
+    --good:#3fcf8e;
+    --good-bg:#0f3327;
+    --shadow-doc: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-float: 0 18px 44px -18px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box;}
+  ::selection{ background:var(--teal-bright); color:#04191b; }
+
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Archivo", ui-sans-serif, system-ui, sans-serif;
+    font-size:16px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    padding-inline: clamp(18px, 5vw, 64px);
+  }
+  a{ color:inherit; }
+  h1,h2,h3{ font-family:"Fraunces", Georgia, serif; text-wrap:balance; margin:0; color:var(--ink); }
+  .mono{ font-family:"JetBrains Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+  .eyebrow{
+    font-family:"JetBrains Mono", monospace;
+    font-size:.72rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal-mid);
+    font-weight:600;
+    display:flex; align-items:center; gap:.6em;
+  }
+  .eyebrow .fls{ color:var(--ink-faint); font-weight:500; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+  }
+
+  /* ============ SHELL / LAYOUT ============ */
+  .shell{ max-width:1180px; margin:0 auto; }
+  .prose{ max-width:660px; }
+
+  .progress{
+    position:fixed; top:0; left:0; height:3px; width:100%;
+    background:var(--line); z-index:60;
+  }
+  .progress > i{
+    display:block; height:100%; width:0%;
+    background:linear-gradient(90deg, var(--teal-mid), var(--teal-bright));
+    transform-origin:left;
+  }
+
+  /* vertical rail of "fls." tabs, dossie-style */
+  .rail{
+    position:fixed; top:0; left:0; height:100vh;
+    display:flex; flex-direction:column; justify-content:center;
+    gap:2px; padding-left:10px; z-index:50;
+  }
+  .rail a{
+    font-family:"JetBrains Mono", monospace; font-size:.68rem; letter-spacing:.08em;
+    color:var(--ink-faint); text-decoration:none; padding:7px 10px 7px 12px;
+    border-left:2px solid var(--line); transition: color .15s, border-color .15s, background .15s;
+    white-space:nowrap;
+  }
+  .rail a:hover{ color:var(--teal-mid); }
+  .rail a.active{ color:var(--teal-bright); border-left-color:var(--teal-bright); background:var(--paper-sunken); font-weight:600; }
+  @media (max-width:1080px){ .rail{ display:none; } }
+
+  section{ padding-block: clamp(56px, 9vw, 108px); border-bottom:1px solid var(--line); }
+  section:last-of-type{ border-bottom:none; }
+
+  .head-row{ display:flex; flex-direction:column; gap:14px; margin-bottom:2.6rem; }
+  .head-row h2{ font-size:clamp(1.7rem, 3.1vw, 2.5rem); font-weight:600; }
+
+  /* ============ HERO ============ */
+  .cover{ padding-top: clamp(48px, 9vw, 92px); border-bottom:1px solid var(--line); }
+  .capa-meta{
+    display:grid; grid-template-columns: repeat(4, 1fr);
+    border:1px solid var(--line-strong); border-radius:var(--radius-doc);
+    background:var(--paper-raised); box-shadow:var(--shadow-doc);
+    margin-bottom:2.6rem; overflow:hidden;
+  }
+  .capa-meta div{ padding:12px 16px; border-left:1px solid var(--line); }
+  .capa-meta div:first-child{ border-left:none; }
+  .capa-meta dt{ font-family:"JetBrains Mono",monospace; font-size:.62rem; letter-spacing:.1em; color:var(--ink-faint); text-transform:uppercase; margin-bottom:4px; }
+  .capa-meta dd{ margin:0; font-size:.88rem; font-weight:600; color:var(--ink); }
+  @media (max-width:760px){ .capa-meta{ grid-template-columns: repeat(2,1fr);} .capa-meta div:nth-child(3){border-left:none;} }
+
+  .hero-grid{ display:grid; grid-template-columns: 1.35fr .9fr; gap:3rem; align-items:start; }
+  @media (max-width:900px){ .hero-grid{ grid-template-columns:1fr; } }
+
+  .hero-title{ font-size:clamp(2.15rem, 4.6vw, 3.6rem); font-weight:600; line-height:1.08; margin-bottom:1.15rem; }
+  .hero-sub{ font-size:1.1rem; color:var(--ink-soft); max-width:54ch; }
+
+  .stat-row{ display:flex; flex-wrap:wrap; gap:2.4rem; margin-top:2.4rem; }
+  .stat-row .stat b{ display:block; font-family:"JetBrains Mono",monospace; font-size:clamp(1.7rem,3vw,2.3rem); font-weight:700; color:var(--teal-mid); line-height:1; }
+  .stat-row .stat span{ font-size:.8rem; color:var(--ink-faint); }
+
+  /* the rubber stamp */
+  .stamp-wrap{ display:flex; justify-content:center; align-items:flex-start; padding-top:.5rem; }
+  .stamp{
+    width:190px; height:190px; border-radius:50%;
+    border:3px solid var(--stamp); position:relative;
+    display:flex; align-items:center; justify-content:center;
+    transform:rotate(-9deg) scale(.92);
+    opacity:0;
+    animation: stamp-in .6s cubic-bezier(.2,.9,.3,1.2) .25s forwards;
+  }
+  @media (prefers-reduced-motion: reduce){ .stamp{ opacity:1; transform:rotate(-9deg); animation:none; } }
+  @keyframes stamp-in{ from{ opacity:0; transform:rotate(-9deg) scale(.7);} to{ opacity:1; transform:rotate(-9deg) scale(1);} }
+  .stamp::before{
+    content:""; position:absolute; inset:8px; border-radius:50%; border:1px solid var(--stamp);
+  }
+  .stamp .txt{
+    font-family:"JetBrains Mono",monospace; color:var(--stamp); text-align:center;
+    font-size:.78rem; font-weight:700; letter-spacing:.06em; line-height:1.5; text-transform:uppercase;
+  }
+  .stamp .txt small{ display:block; font-size:.6rem; font-weight:600; letter-spacing:.12em; opacity:.85; margin-top:3px;}
+
+  /* ============ DOC CARD (base surface) ============ */
+  .card{
+    background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:var(--radius-card); padding:1.4rem 1.5rem;
+    box-shadow:var(--shadow-doc);
+  }
+
+  /* ============ DIAGNÓSTICO: antes / depois ============ */
+  .split{ display:grid; grid-template-columns:1fr 1fr; gap:1.4rem; }
+  @media (max-width:760px){ .split{ grid-template-columns:1fr; } }
+  .split .panel{ border-radius:var(--radius-card); padding:1.6rem; border:1px solid var(--line); }
+  .panel.antes{ background:var(--paper-sunken); }
+  .panel.depois{ background:var(--paper-raised); border-color:var(--teal-bright); box-shadow:var(--shadow-doc); }
+  .panel h3{ font-size:1.05rem; font-family:"Archivo",sans-serif; font-weight:700; margin-bottom:1rem; display:flex; align-items:center; gap:.5em; }
+  .panel ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.7rem; }
+  .panel li{ display:flex; gap:.6em; font-size:.94rem; color:var(--ink-soft); }
+  .panel.antes li::before{ content:"—"; color:var(--ink-faint); flex:none; }
+  .panel.depois li::before{ content:"✓"; color:var(--good); font-weight:700; flex:none; }
+  .panel.depois li{ color:var(--ink); }
+
+  /* ============ MODULE GRID ============ */
+  .mod-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(258px,1fr)); gap:1.1rem; }
+  .mod-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-card);
+    padding:1.3rem 1.35rem; display:flex; flex-direction:column; gap:.7rem;
+    transition:border-color .15s, transform .15s;
+    box-shadow:var(--shadow-doc);
+  }
+  .mod-card:hover{ border-color:var(--teal-bright); transform:translateY(-2px); }
+  .mod-card .ico{ color:var(--teal-mid); }
+  .mod-card h3{ font-family:"Archivo",sans-serif; font-size:1.02rem; font-weight:700; }
+  .mod-card p{ margin:0; font-size:.89rem; color:var(--ink-soft); line-height:1.55; }
+  .mod-card .tags{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.2rem; }
+  .mod-card .tags span{
+    font-family:"JetBrains Mono",monospace; font-size:.65rem; color:var(--teal-mid);
+    background:var(--paper-sunken); border:1px solid var(--line); border-radius:20px; padding:2px 9px;
+  }
+
+  /* ============ AUTOMAÇÕES ============ */
+  .auto-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:1.1rem; }
+  .auto-card{
+    position:relative; background:var(--paper-raised); border:1px dashed var(--line-strong);
+    border-radius:var(--radius-card); padding:1.4rem 1.4rem 1.2rem;
+  }
+  .auto-card .stamp-tag{
+    position:absolute; top:-10px; right:14px; font-family:"JetBrains Mono",monospace;
+    font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; font-weight:700;
+    color:var(--teal-mid); background:var(--paper); border:1px solid var(--teal-bright);
+    border-radius:20px; padding:2px 10px 3px;
+  }
+  .auto-card h3{ font-family:"Archivo",sans-serif; font-size:.98rem; font-weight:700; margin-bottom:.45rem; }
+  .auto-card p{ margin:0; font-size:.88rem; color:var(--ink-soft); }
+
+  /* ============ SEGURANÇA: checklist ============ */
+  .sec-grid{ display:grid; grid-template-columns:1.1fr .9fr; gap:2.4rem; align-items:start; }
+  @media (max-width:860px){ .sec-grid{ grid-template-columns:1fr; } }
+  .checklist{ display:flex; flex-direction:column; gap:0; }
+  .checklist li{ list-style:none; display:flex; gap:.8rem; align-items:flex-start; padding:.85rem 0; border-bottom:1px solid var(--line); }
+  .checklist li:last-child{ border-bottom:none; }
+  .check-box{
+    flex:none; width:19px; height:19px; margin-top:2px; border-radius:4px;
+    border:1.5px solid var(--good); display:flex; align-items:center; justify-content:center;
+    color:var(--good); font-size:.78rem; font-weight:800;
+  }
+  .checklist .txt b{ display:block; font-size:.93rem; }
+  .checklist .txt span{ font-size:.83rem; color:var(--ink-faint); }
+
+  /* ============ COMO FUNCIONA: fluxo ============ */
+  .flow{ display:flex; gap:0; counter-reset:step; }
+  @media (max-width:820px){ .flow{ flex-direction:column; } }
+  .flow .step{ flex:1; position:relative; padding:0 1.3rem 0 0; }
+  .flow .step:not(:last-child)::after{
+    content:""; position:absolute; top:19px; right:-8px; width:16px; height:1px; background:var(--line-strong);
+  }
+  @media (max-width:820px){ .flow .step:not(:last-child)::after{ display:none; } .flow .step{ padding:0 0 1.6rem 0; } }
+  .flow .num{
+    font-family:"JetBrains Mono",monospace; font-weight:700; font-size:.85rem; color:var(--teal-mid);
+    width:38px; height:38px; border:1.5px solid var(--teal-bright); border-radius:50%;
+    display:flex; align-items:center; justify-content:center; margin-bottom:.9rem;
+  }
+  .flow h3{ font-family:"Archivo",sans-serif; font-size:.96rem; font-weight:700; margin-bottom:.35rem; }
+  .flow p{ margin:0; font-size:.85rem; color:var(--ink-soft); }
+
+  /* ============ IDENTIDADE: two mock panes ============ */
+  .id-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1.6rem; align-items:stretch; }
+  @media (max-width:760px){ .id-grid{ grid-template-columns:1fr; } }
+  .id-pane{ border-radius:var(--radius-card); overflow:hidden; border:1px solid var(--line); box-shadow:var(--shadow-float); }
+  .id-pane .cap{ padding:.9rem 1.1rem; font-size:.8rem; color:var(--ink-faint); background:var(--paper-sunken); border-bottom:1px solid var(--line); font-family:"JetBrains Mono",monospace; }
+  .screen-mock{ background:var(--paper); min-height:210px; }
+  .screen-mock .bar{ background:var(--ink); color:#fff; display:flex; align-items:center; gap:.5rem; padding:.6rem 1rem; }
+  .screen-mock .bar .dot{ width:26px; height:26px; border-radius:6px; background:linear-gradient(135deg,var(--teal-mid),var(--teal-glow)); display:flex; align-items:center; justify-content:center; font-family:"Fraunces",serif; font-weight:700; font-size:.75rem; color:var(--ink); }
+  .screen-mock .bar span{ font-family:"Archivo",sans-serif; font-weight:700; font-size:.82rem; }
+  .screen-mock .body{ padding:1.1rem; display:flex; flex-direction:column; gap:.6rem; }
+  .screen-mock .row{ height:10px; border-radius:4px; background:var(--line); width:100%; }
+  .screen-mock .row.short{ width:55%; }
+  .screen-mock .chip{ display:inline-flex; align-self:flex-start; font-family:"JetBrains Mono",monospace; font-size:.62rem; color:var(--teal-mid); background:var(--paper-sunken); border:1px solid var(--line); padding:2px 8px; border-radius:12px; margin-bottom:.3rem; }
+  .paper-mock{ background:#fbfaf6; color:#20242b; min-height:210px; padding:1.3rem 1.3rem 1rem; }
+  .paper-mock .letterhead{ display:flex; align-items:center; gap:.6rem; border-bottom:2px solid #20242b; padding-bottom:.6rem; margin-bottom:.85rem; }
+  .paper-mock .lh-mark{ width:30px; height:30px; border-radius:5px; background:#20242b; }
+  .paper-mock .lh-name{ font-family:"Archivo",sans-serif; font-weight:800; font-size:.82rem; }
+  .paper-mock .title{ font-family:"Fraunces",serif; font-weight:600; font-size:.98rem; text-align:center; margin-bottom:.8rem; }
+  .paper-mock table{ width:100%; border-collapse:collapse; font-size:.62rem; }
+  .paper-mock th,.paper-mock td{ border:1px solid #d9d6c9; padding:4px 6px; text-align:left; }
+  .paper-mock th{ background:#f0eee4; font-family:"JetBrains Mono",monospace; }
+
+  /* ============ RELATÓRIO MOCK (dashboard showcase) ============ */
+  .dash-mock{ border:1px solid var(--line); border-radius:var(--radius-card); overflow:hidden; box-shadow:var(--shadow-float); background:var(--paper-raised); }
+  .dash-mock .chrome{ background:var(--paper-sunken); padding:.55rem .9rem; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); }
+  .dash-mock .chrome i{ width:9px; height:9px; border-radius:50%; background:var(--line-strong); }
+  .dash-mock .chrome .url{ font-family:"JetBrains Mono",monospace; font-size:.68rem; color:var(--ink-faint); background:var(--paper); border:1px solid var(--line); border-radius:5px; padding:2px 10px; margin-left:8px; }
+  .dash-mock .inner{ padding:1.3rem; overflow-x:auto; }
+  .dash-tiles{ display:grid; grid-template-columns:repeat(2,1fr); gap:.7rem; margin-bottom:1.1rem; }
+  .dash-tiles div{ background:var(--paper-sunken); border:1px solid var(--line); border-radius:8px; padding:.7rem .85rem; }
+  .dash-tiles div small{ display:block; font-size:.66rem; color:var(--ink-faint); margin-bottom:3px; }
+  .dash-tiles div b{ font-family:"JetBrains Mono",monospace; font-size:1.2rem; }
+  table.rep{ width:100%; border-collapse:collapse; font-size:.76rem; table-layout:fixed; }
+  table.rep td, table.rep th{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.rep th{ text-align:left; font-family:"JetBrains Mono",monospace; font-size:.66rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.05em; padding:.4rem .5rem; border-bottom:1px solid var(--line-strong); }
+  table.rep td{ padding:.55rem .5rem; border-bottom:1px solid var(--line); }
+  table.rep td.mono{ font-weight:600; }
+  .badge{ font-family:"Archivo",sans-serif; font-size:.7rem; font-weight:700; padding:2px 9px; border-radius:20px; }
+  .badge.win{ background:var(--good-bg); color:var(--good); }
+  .badge.pend{ background:var(--paper-sunken); color:var(--ink-faint); }
+  .mock-note{ font-size:.72rem; color:var(--ink-faint); text-align:center; margin-top:.6rem; }
+
+  /* ============ COMERCIAL / CLOSING ============ */
+  .closing{ background:var(--ink); color:var(--paper); border-radius:14px; padding:clamp(2rem,5vw,3.4rem); }
+  .closing h2{ color:var(--paper); }
+  .closing .terms{ display:grid; grid-template-columns:repeat(3,1fr); gap:1.4rem; margin:2rem 0 2.4rem; }
+  @media (max-width:760px){ .closing .terms{ grid-template-columns:1fr; } }
+  .closing .terms div{ border-left:2px solid var(--teal-glow); padding-left:1rem; }
+  .closing .terms b{ display:block; font-family:"Archivo",sans-serif; font-size:.95rem; margin-bottom:.3rem; color:#fff; }
+  .closing .terms span{ font-size:.85rem; color:#b9d1cf; }
+  .signoff{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; padding-top:1.6rem; border-top:1px solid rgba(255,255,255,.18); }
+  .signoff .lockup{ display:flex; align-items:center; gap:.6rem; }
+  .signoff .mark{ width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg,var(--teal-mid),var(--teal-glow)); display:flex; align-items:center; justify-content:center; font-family:"Fraunces",serif; font-weight:700; color:#04191b; }
+  .signoff .name{ font-family:"Archivo",sans-serif; font-weight:800; letter-spacing:.02em; color:#fff; }
+  .signoff .name small{ display:block; font-weight:500; font-size:.72rem; color:#9fc2bf; letter-spacing:.08em; }
+  .signoff .final-stamp{ font-family:"JetBrains Mono",monospace; font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--teal-glow); border:1px solid var(--teal-glow); border-radius:20px; padding:5px 14px; }
+
+  footer{ padding-block:2.2rem; text-align:center; font-size:.76rem; color:var(--ink-faint); font-family:"JetBrains Mono",monospace; }
+
+  /* ============ IMPRESSÃO / PDF ============ */
+  /* Cada "fls." vira uma página do PDF; a tela em si (trilho lateral, barra de
+     progresso) só faz sentido rolando no navegador, então some no papel. */
+  @media print{
+    *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .rail, .progress{ display:none !important; }
+    body{ padding-inline:34px; }
+    section{ break-before:page; padding-block:34px 10px; }
+    .cover{ padding-top:10px; }
+    .stamp{ opacity:1 !important; animation:none !important; }
+    .mod-card:hover{ transform:none; }
+    .capa-meta, .panel, .mod-card, .auto-card, .checklist li, .stat,
+    .dash-mock, .id-pane, .flow .step, .closing{ break-inside:avoid; }
+  }
+</style>
+
+<div class="progress"><i id="progressFill"></i></div>
+<nav class="rail" id="rail" aria-label="Seções da apresentação">
+  <a href="#capa">CAPA</a>
+  <a href="#diagnostico">FLS. 001</a>
+  <a href="#modulos">FLS. 002</a>
+  <a href="#automacoes">FLS. 003</a>
+  <a href="#seguranca">FLS. 004</a>
+  <a href="#funcionamento">FLS. 005</a>
+  <a href="#identidade">FLS. 006</a>
+  <a href="#proposta">FLS. 007</a>
+</nav>
+
+<div class="shell">
+
+  <header class="cover" id="capa">
+    <dl class="capa-meta">
+      <div><dt>Produto</dt><dd>Licita-VMO</dd></div>
+      <div><dt>Assunto</dt><dd>Gestão de licitações públicas</dd></div>
+      <div><dt>Ambiente</dt><dd>Nuvem, exclusivo por empresa</dd></div>
+      <div><dt>Status</dt><dd>Em produção</dd></div>
+    </dl>
+
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">VMO Sistemas — apresentação comercial</p>
+        <h1 class="hero-title">Do cadastro à proposta, sem perder o controle.</h1>
+        <p class="hero-sub">Um sistema pensado para quem vive de pregão: cada licitação, seus itens, a proposta e o resultado num só lugar — acessível pela equipe inteira, ao mesmo tempo, de qualquer computador.</p>
+
+        <div class="stat-row">
+          <div class="stat"><b class="mono">4</b><span>relatórios prontos, com busca e filtro</span></div>
+          <div class="stat"><b class="mono">10–15</b><span>licitações por dia, sem perder o ritmo</span></div>
+          <div class="stat"><b class="mono">1</b><span>ambiente exclusivo, só da sua empresa</span></div>
+        </div>
+      </div>
+
+      <div class="stamp-wrap">
+        <div class="stamp">
+          <div class="txt">Sistema<br>em produção<small>licita-vmo · nuvem</small></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="diagnostico">
+    <div class="head-row">
+      <p class="eyebrow"><span class="fls">Fls. 001</span> Diagnóstico</p>
+      <h2>O problema não é a licitação. É tudo em volta dela.</h2>
+      <p class="prose" style="color:var(--ink-soft)">Boa parte do setor ainda roda em cima de planilha solta, sistema antigo que não conversa com mais nada, e proposta remontada do zero toda vez. Cada colaborador com o pedaço da informação que coube pra ele.</p>
+    </div>
+
+    <div class="split">
+      <div class="panel antes">
+        <h3>Do jeito que a maioria ainda trabalha</h3>
+        <ul>
+          <li>Cadastro da licitação num sistema, cotação numa planilha, proposta num documento à parte — três lugares pra manter iguais.</li>
+          <li>Cálculo de valor mínimo e margem refeito na mão a cada item, com risco de fórmula quebrada.</li>
+          <li>Sem visão de quem já lançou o quê em qual sistema externo — fácil duplicar ou esquecer.</li>
+          <li>Cada computador com sua própria cópia dos dados; ninguém vê o que o colega acabou de cadastrar.</li>
+          <li>Proposta remontada no Word a cada pregão, com risco de esquecer um dado ou usar a conta bancária errada.</li>
+        </ul>
+      </div>
+      <div class="panel depois">
+        <h3>Com o Licita-VMO</h3>
+        <ul>
+          <li>Uma licitação, um cadastro: itens, prazos, documentos e proposta vivem no mesmo lugar.</li>
+          <li>Planilha de cotação importada direto — o sistema calcula margem e valor mínimo sozinho.</li>
+          <li>Controle de lançamento em sistemas externos (por exemplo, o Kralen) pra nunca duplicar nem esquecer.</li>
+          <li>Banco em nuvem: a equipe inteira enxerga a mesma informação, ao vivo.</li>
+          <li>Proposta em PDF pronta em minutos, já com a marca e a conta bancária certas.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="modulos">
+    <div class="head-row">
+      <p class="eyebrow"><span class="fls">Fls. 002</span> Módulos</p>
+      <h2>Tudo o que o dia a dia de licitação exige, num sistema só.</h2>
+    </div>
+
+    <div class="mod-grid">
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h9l4 4v16H6z"/><path d="M15 2v4h4"/><path d="M9 12h7M9 16h7M9 8h3"/></svg>
+        <h3>Cadastro de Licitações</h3>
+        <p>Código sequencial automático, dados do certame, credenciamento e sessão, tipo de disputa, prazos de entrega/garantia/pagamento, vigência de contrato e observações internas — tudo com histórico de quem cadastrou.</p>
+        <div class="tags"><span>órgão</span><span>pregão</span><span>prazos</span><span>status</span></div>
+      </div>
+
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h18v4H3zM3 12h18M3 20h18M8 4v16M16 4v16"/></svg>
+        <h3>Itens &amp; Cotação</h3>
+        <p>Importa a planilha de cotação já usada pela sua equipe, calcula valor mínimo e referência a partir do custo, e marca vencedor ou desclassificado item a item — com motivo registrado.</p>
+        <div class="tags"><span>importação de planilha</span><span>cálculo em cascata</span></div>
+      </div>
+
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h9l4 4v16H6z"/><path d="M15 2v4h4"/><path d="m9 15 2 2 4-4"/></svg>
+        <h3>Propostas em PDF</h3>
+        <p>Gerada com a identidade visual da sua empresa, com a conta bancária certa selecionada na hora da emissão e as declarações do setor já anexadas.</p>
+        <div class="tags"><span>marca própria</span><span>múltiplas contas</span></div>
+      </div>
+
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        <h3>Relatórios</h3>
+        <p>Status das Licitações, Itens Ganhos, Itens Perdidos e Itens Desclassificados — cada um com busca, filtro por período e por lançamento externo, e exportação em PDF.</p>
+        <div class="tags"><span>busca</span><span>filtro por período</span></div>
+      </div>
+
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <h3>Painel do mês</h3>
+        <p>Visão consolidada: total de licitações, cadastradas no ano, por tipo de objeto e de disputa, o que está aguardando resultado e as últimas adicionadas.</p>
+        <div class="tags"><span>visão geral</span></div>
+      </div>
+
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h5l2-2h4l2 2h5v13H3z"/></svg>
+        <h3>Contratantes, Atas &amp; Anexos</h3>
+        <p>Cadastro de órgãos e municípios reaproveitável entre licitações, controle de vigência de ata/contrato com data final calculada sozinha, e anexos por processo.</p>
+        <div class="tags"><span>vigência automática</span></div>
+      </div>
+
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M4 10h16M5 10V6l7-3 7 3v4M9 14v4M15 14v4"/></svg>
+        <h3>Empresa &amp; Contas Bancárias</h3>
+        <p>Dados cadastrais únicos da empresa e quantas contas bancárias forem necessárias, cada uma com apelido para escolher rápido na hora de emitir a proposta.</p>
+        <div class="tags"><span>multi-conta</span></div>
+      </div>
+
+      <div class="mod-card">
+        <svg class="ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="18" cy="7" r="2.3"/><path d="M22 20c0-2.6-1.9-4.7-4.5-5.3"/></svg>
+        <h3>Usuários &amp; Acesso</h3>
+        <p>Perfis de administrador, moderador e usuário, ativação manual de cada conta nova, e a equipe inteira trabalhando sobre o mesmo banco em tempo real.</p>
+        <div class="tags"><span>permissões</span><span>tempo real</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="automacoes">
+    <div class="head-row">
+      <p class="eyebrow"><span class="fls">Fls. 003</span> Automações</p>
+      <h2>O que você para de fazer na mão.</h2>
+      <p class="prose" style="color:var(--ink-soft)">Cada item aqui é um passo manual que existia antes e que o sistema passou a resolver sozinho.</p>
+    </div>
+
+    <div class="auto-grid">
+      <div class="auto-card"><span class="stamp-tag">automático</span>
+        <h3>Importação reconhece a planilha sozinha</h3>
+        <p>Não importa se a planilha ganhou uma coluna a mais ou um cabeçalho fora do lugar — o sistema encontra a âncora certa e lê a partir dela.</p>
+      </div>
+      <div class="auto-card"><span class="stamp-tag">automático</span>
+        <h3>Custo muda, tudo recalcula</h3>
+        <p>Alterou o custo de um item? Margem, valor mínimo e totais são recalculados na hora, sem fórmula de planilha pra manter.</p>
+      </div>
+      <div class="auto-card"><span class="stamp-tag">automático</span>
+        <h3>Proposta em PDF com um clique</h3>
+        <p>Já sai com a marca da empresa e a conta bancária certa — nada de editar modelo no Word a cada pregão novo.</p>
+      </div>
+      <div class="auto-card"><span class="stamp-tag">automático</span>
+        <h3>Vigência de ata calculada sozinha</h3>
+        <p>Informa a data de início e quantos meses — o fim da vigência é calculado e fica visível sem planilha de controle à parte.</p>
+      </div>
+      <div class="auto-card"><span class="stamp-tag">automático</span>
+        <h3>Sem duplicar lançamento externo</h3>
+        <p>O filtro de "lançado ou não" (por exemplo, no Kralen) mostra na hora o que ainda falta passar pra frente — e o que já foi.</p>
+      </div>
+      <div class="auto-card"><span class="stamp-tag">automático</span>
+        <h3>Trilha de auditoria sozinha</h3>
+        <p>Quem cadastrou, quem editou e quando fica registrado automaticamente — sem planilha paralela de controle.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="seguranca">
+    <div class="sec-grid">
+      <div>
+        <p class="eyebrow"><span class="fls">Fls. 004</span> Segurança &amp; confiabilidade</p>
+        <h2 style="margin-top:.6rem; margin-bottom:1.4rem;">Dado de licitação é dado sensível. Tratado assim.</h2>
+        <p class="prose" style="color:var(--ink-soft); margin-bottom:1.6rem;">CNPJ, conta bancária, valor de custo, margem — nada disso deveria estar a um clique de qualquer pessoa. A segurança aqui não é uma tela de aviso, é regra no próprio banco de dados.</p>
+        <ul class="checklist">
+          <li><span class="check-box">✓</span><span class="txt"><b>Controle de acesso linha a linha</b><span>Cada usuário só lê e escreve o que a política do banco permite — não é uma regra "confiar no aplicativo".</span></span></li>
+          <li><span class="check-box">✓</span><span class="txt"><b>Conta nova nasce bloqueada</b><span>Precisa de liberação manual de um administrador antes de enxergar qualquer dado — mesmo em caso de falha de configuração.</span></span></li>
+          <li><span class="check-box">✓</span><span class="txt"><b>Trilha de auditoria consultável</b><span>Toda ação relevante fica registrada e disponível pro administrador ver quem fez o quê.</span></span></li>
+          <li><span class="check-box">✓</span><span class="txt"><b>271 verificações antes de cada atualização</b><span>Bateria automática de testes cobrindo do login ao fechamento de uma proposta, rodada antes de qualquer novidade ir ao ar.</span></span></li>
+          <li><span class="check-box">✓</span><span class="txt"><b>Backup e disponibilidade em nuvem</b><span>A infraestrutura cuida disso — não depende do computador de ninguém na empresa.</span></span></li>
+        </ul>
+      </div>
+
+      <div class="dash-mock">
+        <div class="chrome"><i></i><i></i><i></i><span class="url">app.suaempresa.com.br/relatorios</span></div>
+        <div class="inner">
+          <div class="dash-tiles">
+            <div><small>Ganhou</small><b class="mono" style="color:var(--good)">7</b></div>
+            <div><small>Perdeu</small><b class="mono" style="color:var(--stamp)">2</b></div>
+            <div><small>Sem status</small><b class="mono">3</b></div>
+            <div><small>Taxa de sucesso</small><b class="mono" style="color:var(--teal-mid)">77,8%</b></div>
+          </div>
+          <table class="rep">
+            <thead><tr><th>Licitação</th><th>Órgão</th><th>Pregão</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">142</td><td>Prefeitura de Vale Verde</td><td class="mono">nº 018/2026</td><td><span class="badge win">Ganhou</span></td></tr>
+              <tr><td class="mono">143</td><td>Secretaria de Saúde — Serra Alta</td><td class="mono">nº 019/2026</td><td><span class="badge pend">Sem status</span></td></tr>
+              <tr><td class="mono">144</td><td>Hospital Regional Norte</td><td class="mono">nº 020/2026</td><td><span class="badge win">Ganhou</span></td></tr>
+            </tbody>
+          </table>
+          <p class="mock-note">Dados ilustrativos — layout real do relatório de status.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="funcionamento">
+    <div class="head-row">
+      <p class="eyebrow"><span class="fls">Fls. 005</span> Como funciona</p>
+      <h2>Sem servidor pra manter, sem instalação, sem TI dedicado.</h2>
+    </div>
+
+    <div class="flow">
+      <div class="step">
+        <div class="num mono">1</div>
+        <h3>Ambiente exclusivo</h3>
+        <p>Sua empresa ganha uma instância só sua — não é uma conta dentro de um sistema compartilhado com outras empresas.</p>
+      </div>
+      <div class="step">
+        <div class="num mono">2</div>
+        <h3>Acesso pelo navegador</h3>
+        <p>De qualquer computador, sem instalar nada e sem depender de licença por máquina.</p>
+      </div>
+      <div class="step">
+        <div class="num mono">3</div>
+        <h3>Equipe no mesmo dado</h3>
+        <p>Cadastrou de manhã, o colega já vê à tarde — sem exportar, sem reimportar, sem duplicar planilha.</p>
+      </div>
+      <div class="step">
+        <div class="num mono">4</div>
+        <h3>Atualizações chegam sozinhas</h3>
+        <p>Novidade no produto vira novidade pra todo mundo ao mesmo tempo, sem passo manual da sua equipe.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="identidade">
+    <div class="head-row">
+      <p class="eyebrow"><span class="fls">Fls. 006</span> Identidade</p>
+      <h2>A interface é da VMO. O documento que sai, é seu.</h2>
+      <p class="prose" style="color:var(--ink-soft)">Quem abre o sistema vê a marca do Licita-VMO. Quem recebe a proposta, a declaração ou o checklist recebe a marca da <em>sua</em> empresa — porque é isso que chega à mão do órgão público, assinado por vocês.</p>
+    </div>
+
+    <div class="id-grid">
+      <div class="id-pane">
+        <div class="cap">Tela do sistema</div>
+        <div class="screen-mock">
+          <div class="bar"><div class="dot">W</div><span>VMO Sistemas</span></div>
+          <div class="body">
+            <span class="chip">Licitações</span>
+            <div class="row"></div><div class="row short"></div><div class="row"></div>
+          </div>
+        </div>
+      </div>
+      <div class="id-pane">
+        <div class="cap">Documento emitido (PDF)</div>
+        <div class="paper-mock">
+          <div class="letterhead"><div class="lh-mark"></div><span class="lh-name">Sua Empresa Ltda</span></div>
+          <div class="title">Proposta de Preços</div>
+          <table>
+            <thead><tr><th>Item</th><th>Descrição</th><th>Qtd</th><th>Valor</th></tr></thead>
+            <tbody><tr><td>01</td><td>Item da licitação</td><td>120</td><td>R$ —</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="proposta" style="border-bottom:none;">
+    <p class="eyebrow" style="margin-bottom:1.6rem;"><span class="fls">Fls. 007</span> Proposta comercial</p>
+
+    <div class="closing">
+      <h2 style="font-size:clamp(1.6rem,3vw,2.3rem)">Simples de entender, simples de aprovar.</h2>
+      <div class="terms">
+        <div><b>Sem custo de implantação</b><span>O ambiente é preparado e entregue pronto pra sua equipe usar.</span></div>
+        <div><b>Mensalidade cobre só o essencial</b><span>O valor é referente à hospedagem em nuvem do ambiente exclusivo da sua empresa.</span></div>
+        <div><b>Evolui sem custo extra</b><span>Novos relatórios e automações do produto chegam pro seu ambiente junto com todo mundo.</span></div>
+      </div>
+      <div class="signoff">
+        <div class="lockup">
+          <div class="mark">W</div>
+          <div class="name">VMO Sistemas<small>LICITA-VMO</small></div>
+        </div>
+        <span class="final-stamp">Pronto para apresentar</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>Licita-VMO — VMO Sistemas · documento de apoio para apresentação comercial</footer>
+</div>
+
+<script>
+(function(){
+  var progress = document.getElementById('progressFill');
+  function onScroll(){
+    var h = document.documentElement;
+    var pct = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+    progress.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  }
+  document.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('#rail a'));
+  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if ('IntersectionObserver' in window && sections.length){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        var link = document.querySelector('#rail a[href="#' + entry.target.id + '"]');
+        if (!link) return;
+        if (entry.isIntersecting) {
+          links.forEach(function(l){ l.classList.remove('active'); });
+          link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+    sections.forEach(function(s){ io.observe(s); });
+  }
+})();
+</script>

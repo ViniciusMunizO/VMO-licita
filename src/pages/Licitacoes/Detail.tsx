@@ -12,7 +12,8 @@ import PrintableProposta from '../../components/PrintableProposta'
 import { setLancadoNoKralen } from '../../utils/kralen'
 import { getLicitacao, updateLicitacao } from '../../utils/licitacoes'
 import { listItems, updateItem } from '../../utils/items'
-import { listAttachments } from '../../utils/attachments'
+import { listAttachments, getAttachmentData } from '../../utils/attachments'
+import { uploadAnexo, removerDoStorage, urlAssinada } from '../../utils/arquivo'
 import { listAtas, addAta, removeAta as removeAtaApi } from '../../utils/atas'
 import { getEmpresaInfo } from '../../utils/empresa'
 import { auditLog } from '../../utils/audit'
@@ -78,6 +79,10 @@ export default function DetailLicitacao() {
   // pra clicar em "Emitir Proposta" nesse intervalo e sair um PDF sem CNPJ,
   // endereço nem conta bancária — e sem sequer perguntar qual conta usar.
   const [carregandoDados, setCarregandoDados] = useState(true)
+  // Erro de leitura precisa aparecer: engolido, ele virava "Nenhum anexo" /
+  // "Nenhuma ata" na tela — indistinguível de uma licitação que de fato não
+  // tem nada cadastrado.
+  const [erroDados, setErroDados] = useState('')
   const printRef = useRef<HTMLDivElement | null>(null)
   const itemsRef = useRef<HTMLDivElement | null>(null)
   const propostaRef = useRef<HTMLDivElement | null>(null)
@@ -103,7 +108,7 @@ export default function DetailLicitacao() {
           setEmpresa(rawEmpresa)
         }
       } catch (err) {
-        // ignore
+        if (mounted) setErroDados('Não consegui carregar itens, anexos e atas desta licitação. Recarregue a página antes de editar ou emitir documentos.')
       } finally {
         if (mounted) setCarregandoDados(false)
       }
@@ -116,8 +121,23 @@ export default function DetailLicitacao() {
   const [openAttachments, setOpenAttachments] = useState(false)
   const [showAtaModal, setShowAtaModal] = useState(false)
 
+  // Deixa o erro subir de propósito: quem trata é o AtaContratoModal, que só
+  // fecha e limpa o formulário depois que a gravação confirma.
   const saveAta = async (ata: Ata) => {
-    const updated = await addAta(codigo!, ata)
+    const { arquivo, ...resto } = ata
+    let anexo: Ata['anexo'] = null
+    if (arquivo) {
+      const enviado = await uploadAnexo(arquivo, `atas/${codigo}`)
+      anexo = { name: enviado.filename, path: enviado.path, mime: enviado.mime, size: enviado.size }
+    }
+    let updated: Ata[]
+    try {
+      updated = await addAta(codigo!, { ...resto, anexo })
+    } catch (err) {
+      // O arquivo já subiu; sem a linha da ata ninguém mais chegaria nele.
+      if (anexo?.path) await removerDoStorage([anexo.path]).catch(() => { /* o erro do insert é o que importa */ })
+      throw err
+    }
     setAtas(updated)
     try {
       const auditUser = localStorage.getItem('user_name') || undefined
@@ -125,9 +145,38 @@ export default function DetailLicitacao() {
     } catch (err) { /* ignore */ }
   }
 
+  // O link do arquivo é gerado no clique: o bucket é privado, então a URL é
+  // assinada e de curta duração (e anexo antigo, anterior ao Storage, ainda
+  // vem como base64 do banco). A aba é aberta antes do await de propósito:
+  // abrir depois de uma operação assíncrona é o que os bloqueadores de pop-up
+  // barram.
+  const abrirEm = async (obter: () => Promise<string | null>) => {
+    const aba = window.open('', '_blank')
+    try {
+      const url = await obter()
+      if (!url) {
+        aba?.close()
+        setErroDados('O conteúdo deste anexo não está disponível.')
+        return
+      }
+      if (aba) aba.location.href = url
+    } catch (err: any) {
+      aba?.close()
+      setErroDados(err?.message || 'Não consegui abrir o anexo.')
+    }
+  }
+
+  const abrirAnexo = (att: any) => abrirEm(() => att.path ? urlAssinada(att.path) : getAttachmentData(att.id))
+
+  const abrirAnexoAta = (ata: any) => abrirEm(async () => ata.anexo?.path ? urlAssinada(ata.anexo.path) : (ata.anexo?.data || null))
+
   const removeAta = async (id: string) => {
-    const list = await removeAtaApi(id, codigo!)
-    setAtas(list)
+    try {
+      const list = await removeAtaApi(id, codigo!)
+      setAtas(list)
+    } catch (err: any) {
+      setErroDados(err?.message || 'Não consegui remover a ata/contrato.')
+    }
   }
   const [showPropostaModal, setShowPropostaModal] = useState(false)
   const [bancoProposta, setBancoProposta] = useState('')
@@ -276,6 +325,12 @@ export default function DetailLicitacao() {
         </div>
       </div>
 
+      {erroDados && (
+        <div className="mt-4 p-3 rounded text-sm" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>
+          {erroDados}
+        </div>
+      )}
+
       <div className="mt-4">
         <h4 className="font-semibold mb-2">Atas / Contratos</h4>
         {atas.length === 0 ? (
@@ -303,7 +358,7 @@ export default function DetailLicitacao() {
                     <td className="p-2">{formatDateBR(a.fimVigencia)}</td>
                     <td className="p-2">{a.observacoes || '-'}</td>
                     <td className="p-2">
-                      {a.anexo ? <a href={a.anexo.data} target="_blank" rel="noreferrer" className="link-primary">{a.anexo.name}</a> : '-'}
+                      {a.anexo ? <button onClick={() => abrirAnexoAta(a)} className="link-primary">{a.anexo.name}</button> : '-'}
                     </td>
                     <td className="p-2">
                       <button onClick={() => removeAta(a.id)} className="btn text-xs" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>Remover</button>
@@ -680,7 +735,7 @@ export default function DetailLicitacao() {
             {attachments.map((a, i) => (
               <li key={i} className="text-sm">
                 {a.name || `anexo-${i}`}
-                {a.data && <a className="ml-2 link-primary" href={a.data} target="_blank" rel="noreferrer">Abrir</a>}
+                <button onClick={() => abrirAnexo(a)} className="ml-2 link-primary">Abrir</button>
               </li>
             ))}
           </ul>

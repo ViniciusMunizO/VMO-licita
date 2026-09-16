@@ -168,10 +168,22 @@ create table if not exists attachments (
   "licitacaoCodigo" bigint not null references licitacoes(codigo) on delete cascade,
   name text,
   filename text,
-  data text, -- base64 (data URI) — igual ao que já era guardado hoje
+  -- `data` é o modelo antigo: o arquivo inteiro em base64 dentro da linha.
+  -- Continua aqui só pelos anexos gravados antes da migração pro Storage —
+  -- anexo novo nasce com `path` preenchido e `data` nulo. Depois de rodar
+  -- `scripts/migrar-anexos-storage.js` em todos os ambientes, esta coluna
+  -- pode ser removida.
+  data text,
+  -- Caminho do objeto no bucket "anexos" (ex.: licitacoes/42/uuid-edital.pdf).
+  path text,
+  mime text,
+  size bigint,
   date timestamptz not null default now()
 );
 create index if not exists attachments_licitacao_idx on attachments ("licitacaoCodigo");
+alter table attachments add column if not exists path text;
+alter table attachments add column if not exists mime text;
+alter table attachments add column if not exists size bigint;
 
 -- ============================================================
 -- atas (atas de registro de preços / contratos)
@@ -185,6 +197,8 @@ create table if not exists atas (
   "fimVigencia" text,
   meses integer,
   observacoes text,
+  -- { name, path, mime, size } no modelo novo; { name, data } (base64) nas
+  -- atas criadas antes da migração pro Storage.
   anexo jsonb,
   "criadoEm" bigint,
   "criadoPor" text
@@ -229,6 +243,38 @@ set search_path = ''
 as $$
   select coalesce((select p.ativo from public.profiles p where p.id = auth.uid()), false);
 $$;
+
+-- ============================================================
+-- Storage — bucket "anexos"
+--
+-- Guarda o arquivo de verdade (edital, ata assinada, comprovante) fora do
+-- Postgres. Antes o conteúdo ia em base64 dentro da própria linha, o que
+-- inflava o arquivo em ~33% e fazia a tela de detalhe baixar todos os anexos
+-- só pra escrever os nomes na lista.
+--
+-- O bucket é privado de propósito: documento de licitação não é público, e
+-- link público não expira nem dá pra revogar. O app abre cada arquivo com
+-- URL assinada de curta duração, gerada só pra quem está logado e ativo.
+-- ============================================================
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('anexos', 'anexos', false, 52428800) -- 50 MB
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit;
+
+-- Mesma regra das tabelas de negócio: quem está autenticado E ativo usa o
+-- bucket inteiro. `membro_ativo()` já existe acima e é SECURITY DEFINER.
+drop policy if exists "membro ativo le anexos" on storage.objects;
+drop policy if exists "membro ativo grava anexos" on storage.objects;
+drop policy if exists "membro ativo atualiza anexos" on storage.objects;
+drop policy if exists "membro ativo apaga anexos" on storage.objects;
+create policy "membro ativo le anexos" on storage.objects for select
+  using (bucket_id = 'anexos' and public.membro_ativo());
+create policy "membro ativo grava anexos" on storage.objects for insert
+  with check (bucket_id = 'anexos' and public.membro_ativo());
+create policy "membro ativo atualiza anexos" on storage.objects for update
+  using (bucket_id = 'anexos' and public.membro_ativo())
+  with check (bucket_id = 'anexos' and public.membro_ativo());
+create policy "membro ativo apaga anexos" on storage.objects for delete
+  using (bucket_id = 'anexos' and public.membro_ativo());
 
 drop policy if exists "autenticado le/grava profiles" on profiles;
 drop policy if exists "usuario ve o proprio profile" on profiles;

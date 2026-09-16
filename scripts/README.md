@@ -112,6 +112,34 @@ Para conferir a paleta a olho depois de mexer nela:
 node scripts/_shot-paleta.js   # prints de login, painel e relatórios em scripts/_shots/
 ```
 
+## Migração dos anexos para o Storage
+
+Os anexos (de licitação e de ata/contrato) ficavam em base64 dentro da própria
+linha do Postgres. Agora o arquivo vai pro bucket privado `anexos` do Supabase
+Storage e a linha guarda só o caminho (`attachments.path`, `atas.anexo.path`).
+
+Para um ambiente que já tem anexos gravados no modelo antigo:
+
+1. Aplique o `supabase/schema.sql` atualizado (Dashboard -> SQL Editor). É ele
+   que cria o bucket, as políticas de acesso e as colunas `path`/`mime`/`size`.
+2. Rode a migração com uma conta de membro ativo:
+
+```powershell
+$env:MIGRACAO_LOGIN="admin@empresa.com"
+$env:MIGRACAO_SENHA="..."
+
+node scripts/migrar-anexos-storage.js            # simulação: só mostra o que faria
+node scripts/migrar-anexos-storage.js --aplicar  # migra de verdade
+```
+
+O script é idempotente: processa só linha que ainda tem base64 e não tem
+caminho, então pode ser rodado de novo depois de qualquer interrupção. Linha
+que falha mantém o base64 no banco e é listada no resumo.
+
+Enquanto a migração não roda, os dois formatos convivem — anexo antigo continua
+abrindo normalmente pela tela. Depois que todos os ambientes estiverem
+migrados, a coluna `attachments.data` pode ser removida.
+
 ## Limpeza
 
 `node scripts/_limpar-teste.js` remove as licitações de teste que sobrarem

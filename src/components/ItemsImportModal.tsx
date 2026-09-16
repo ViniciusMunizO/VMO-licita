@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { listItems, replaceItems } from '../utils/items'
+import { auditLog } from '../utils/audit'
 
 // Planilha "02. MODELO DE COTAÇÃO": tem um bloco de cabeçalho do pregão (linhas
 // 1-6, tamanho pode variar um pouco de arquivo pra arquivo) antes da tabela de
@@ -93,9 +94,30 @@ function rowToItem(row: any[], col: Coluna): Record<string, any> {
   }
 }
 
+// FileReader é callback; encapsular numa promessa deixa o onFile ser um
+// async/await só, com um try/catch que pega tanto erro de leitura quanto
+// erro de gravação (antes, o erro do await morria dentro do onload).
+function lerPlanilha(f: File): Promise<any[][]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Não consegui ler o arquivo selecionado.'))
+    reader.onload = e => {
+      try {
+        const workbook = XLSX.read(e.target?.result, { type: 'binary' })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        resolve(XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }))
+      } catch (err) {
+        reject(new Error('Arquivo inválido ou corrompido — não consegui abrir como planilha.'))
+      }
+    }
+    reader.readAsBinaryString(f)
+  })
+}
+
 export default function ItemsImportModal({ open, onClose, codigo }: { open: boolean; onClose: () => void; codigo: number }) {
   const [items, setItems] = useState<any[]>([])
   const [erro, setErro] = useState('')
+  const [importando, setImportando] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -103,16 +125,12 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
     return () => { mounted = false }
   }, [open, codigo])
 
-  const onFile = (f: File | null) => {
+  const onFile = async (f: File | null) => {
     if (!f) return
     setErro('')
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const data = e.target?.result
-      const workbook = XLSX.read(data, { type: 'binary' })
-      const sheetName = workbook.SheetNames[0]
-      const sheet = workbook.Sheets[sheetName]
-      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+    setImportando(true)
+    try {
+      const rows = await lerPlanilha(f)
       const ancora = encontrarAncora(rows)
       if (!ancora) {
         setErro('Não reconheci o modelo dessa planilha — a coluna "COD. KRALEN" não foi encontrada.')
@@ -132,8 +150,19 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
         .filter(it => String(it.descricao || '').trim() !== '')
       const saved = await replaceItems(codigo, parsed)
       setItems(saved)
+      try {
+        const user = localStorage.getItem('user_name') || undefined
+        await auditLog('items_import', { codigo, arquivo: f.name, quantidade: saved.length }, user)
+      } catch (err) { /* ignore */ }
+    } catch (err: any) {
+      // Importar é a operação mais destrutiva do sistema (troca a lista
+      // inteira de itens): falhar calado deixava o usuário achando que tinha
+      // importado. `replaceItems` só chega a escrever depois de validar tudo,
+      // então quando cai aqui a lista antiga continua intacta.
+      setErro(err?.message || 'Não consegui importar a planilha. A lista de itens anterior foi mantida.')
+    } finally {
+      setImportando(false)
     }
-    reader.readAsBinaryString(f)
   }
 
   if (!open) return null
@@ -147,9 +176,18 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
         </div>
 
         <div>
-          <label className="btn btn-ghost inline-flex items-center gap-2">
-            <input type="file" accept=".xls,.xlsx" onChange={e => onFile(e.target.files?.[0] || null)} className="hidden" />
-            Selecionar planilha (.xls/.xlsx)
+          <label className={`btn btn-ghost inline-flex items-center gap-2 ${importando ? 'opacity-50 pointer-events-none' : ''}`}>
+            <input
+              type="file"
+              accept=".xls,.xlsx"
+              disabled={importando}
+              // Limpar o value deixa o onChange disparar de novo quando o
+              // usuário escolhe o mesmo arquivo duas vezes seguidas (corrigir
+              // a planilha e reimportar é exatamente o caso comum aqui).
+              onChange={e => { const f = e.target.files?.[0] || null; e.target.value = ''; void onFile(f) }}
+              className="hidden"
+            />
+            {importando ? 'Importando...' : 'Selecionar planilha (.xls/.xlsx)'}
           </label>
         </div>
 
