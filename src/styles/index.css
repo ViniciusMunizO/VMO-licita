@@ -36,8 +36,23 @@ html, body, #root {
     max-width: 1600px;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  @media (min-width: 640px) {
+    .container-fixed {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+
+  /* Rolagem horizontal pra tabela que não cabe na largura da tela.
+     A tabela dentro dela leva um `min-w-[...]`: sem isso o navegador
+     espreme as colunas até virarem ilegíveis em vez de deixar rolar.
+     `-webkit-overflow-scrolling` mantém o embalo do dedo no iOS. */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .btn { @apply inline-flex items-center gap-2 px-3 py-1 rounded shadow-sm text-sm; }
@@ -82,7 +97,11 @@ html, body, #root {
   }
 }
 
-/* Responsive tweaks */
+/* Campo de formulário nunca menor que 16px no celular: abaixo disso o Safari
+   do iOS dá zoom na tela sozinho ao focar o campo, e a página fica torta.
+   Só até 640px — no desktop o `text-sm` de várias telas continua valendo. */
 @media (max-width: 640px) {
-  .grid-cols-3 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  input, select, textarea {
+    font-size: 16px;
+  }
 }

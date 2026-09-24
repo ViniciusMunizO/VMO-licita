@@ -90,28 +90,53 @@ export default function DetailLicitacao() {
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      const found = await getLicitacao(codigo!)
-      if (!mounted) return
-      setModel(found || null)
-      // load attachments, items and atas/contratos
       try {
-        const [rawAt, rawIt, rawAtas, rawEmpresa] = await Promise.all([
-          listAttachments(codigo!),
-          listItems(codigo!),
-          listAtas(codigo!),
-          getEmpresaInfo(),
-        ])
+        const found = await getLicitacao(codigo!)
+        if (!mounted) return
+        setModel(found || null)
+      } catch (err: any) {
+        // Sem a licitação a tela não tem o que desenhar, mas travar em
+        // "Carregando..." pra sempre é pior do que dizer o que houve.
         if (mounted) {
-          setAttachments(rawAt)
-          setItems(rawIt)
-          setAtas(rawAtas)
-          setEmpresa(rawEmpresa)
+          setErroDados(`Não consegui carregar esta licitação. ${err?.message || ''}`.trim())
+          setCarregandoDados(false)
         }
-      } catch (err) {
-        if (mounted) setErroDados('Não consegui carregar itens, anexos e atas desta licitação. Recarregue a página antes de editar ou emitir documentos.')
-      } finally {
-        if (mounted) setCarregandoDados(false)
+        return
       }
+      // `allSettled`, nunca `all`: são quatro leituras independentes, e com
+      // `Promise.all` a primeira que falhasse descartava as outras três já
+      // prontas. Foi o que aconteceu quando o banco ficou sem as colunas
+      // novas de `attachments` — a licitação aparecia sem NENHUM item, apesar
+      // de os itens terem sido lidos sem erro, porque a falha dos anexos
+      // derrubava o lote inteiro antes do `setItems`.
+      //
+      // Cada bloco agora entra na tela por conta própria e o aviso diz qual
+      // parte faltou, em vez de culpar as quatro.
+      const [resAt, resIt, resAtas, resEmpresa] = await Promise.allSettled([
+        listAttachments(codigo!),
+        listItems(codigo!),
+        listAtas(codigo!),
+        getEmpresaInfo(),
+      ])
+      if (mounted) {
+        if (resAt.status === 'fulfilled') setAttachments(resAt.value)
+        if (resIt.status === 'fulfilled') setItems(resIt.value)
+        if (resAtas.status === 'fulfilled') setAtas(resAtas.value)
+        if (resEmpresa.status === 'fulfilled') setEmpresa(resEmpresa.value)
+
+        const falhas = [
+          resAt.status === 'rejected' && 'anexos',
+          resIt.status === 'rejected' && 'itens',
+          resAtas.status === 'rejected' && 'atas/contratos',
+          resEmpresa.status === 'rejected' && 'dados da empresa',
+        ].filter(Boolean) as string[]
+        if (falhas.length > 0) {
+          const detalhe = [resAt, resIt, resAtas, resEmpresa]
+            .find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+          setErroDados(`Não consegui carregar: ${falhas.join(', ')}. O resto da licitação está na tela. ${detalhe?.reason?.message || ''}`.trim())
+        }
+      }
+      if (mounted) setCarregandoDados(false)
     }
     load()
     return () => { mounted = false }
@@ -299,7 +324,7 @@ export default function DetailLicitacao() {
   const hasLotes = items.some(it => it.lote)
 
   if (!model) return (
-    <div className="bg-white p-6 rounded shadow max-w-5xl mx-auto">
+    <div className="bg-white p-4 sm:p-6 rounded shadow max-w-5xl mx-auto">
       <p className="text-sm text-gray-600">Licitação não encontrada.</p>
       <div className="mt-4">
         <button onClick={() => nav('/licitacoes')} className="btn btn-ghost">Voltar</button>
@@ -308,9 +333,9 @@ export default function DetailLicitacao() {
   )
 
   return (
-    <div className="bg-white p-6 rounded shadow">
-      <div className="flex justify-between items-start">
-        <h3 className="text-xl font-semibold flex items-center gap-3">
+    <div className="bg-white p-4 sm:p-6 rounded shadow">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+        <h3 className="text-lg sm:text-xl font-semibold flex flex-wrap items-center gap-x-3 gap-y-2">
           Licitação {model.codigo} — {model.ano}
           <StatusBadge status={model.status} />
           <label className="flex items-center gap-2 text-sm font-normal text-gray-600">
@@ -318,7 +343,7 @@ export default function DetailLicitacao() {
             Lançada no Kralen
           </label>
         </h3>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 flex-shrink-0">
           <button onClick={() => setShowAtaModal(true)} className="btn btn-primary">Novo Contrato</button>
           <Link to={`/licitacoes/novo?edit=${model.codigo}`} className="btn btn-primary">Editar</Link>
           <button onClick={() => nav('/licitacoes')} className="btn btn-ghost">Voltar</button>
@@ -336,8 +361,8 @@ export default function DetailLicitacao() {
         {atas.length === 0 ? (
           <div className="text-sm text-gray-500">Nenhuma ata/contrato cadastrado ainda.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto text-sm">
+          <div className="table-scroll">
+            <table className="w-full table-auto text-sm min-w-[720px]">
               <thead>
                 <tr className="text-left text-xs text-gray-500 whitespace-nowrap">
                   <th className="p-2">Tipo</th>
@@ -371,7 +396,7 @@ export default function DetailLicitacao() {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <strong>Contratante</strong>
           <div className="mt-1">{model.contratante?.nome || model.contratado || model.empresa?.razaoSocial || '-'}</div>
@@ -411,7 +436,7 @@ export default function DetailLicitacao() {
         <h4 className="font-semibold">Habilitação (Checklist)</h4>
         {model.habilitacao ? (
           <>
-            <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               {HABILITACAO_ITEMS.map(({ key, label }) => {
                 const checked = !!model.habilitacao[key]
                 return (
@@ -442,7 +467,7 @@ export default function DetailLicitacao() {
 
       <div className="mt-6">
         <h4 className="font-semibold">Proposta</h4>
-        <div className="mt-2 grid grid-cols-3 gap-4">
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <strong>Validade da Proposta</strong>
             <div className="mt-1">{model.prazoValidade || '-'}</div>
@@ -475,8 +500,8 @@ export default function DetailLicitacao() {
         {items.length === 0 ? (
           <div className="text-sm text-gray-500 mt-2">Nenhum item importado</div>
         ) : (
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full table-auto text-sm">
+          <div className="mt-2 table-scroll">
+            <table className="w-full table-auto text-sm min-w-[1100px]">
               <thead>
                 <tr className="text-left text-xs text-gray-500 whitespace-nowrap">
                   {hasLotes && <th className="p-2">Lote</th>}
@@ -660,9 +685,9 @@ export default function DetailLicitacao() {
                       {isEditing && (
                         <tr className="bg-cyan-50/40 border-t">
                           <td colSpan={hasLotes ? 17 : 16} className="p-4" onClick={e => e.stopPropagation()}>
-                            <div className="grid grid-cols-4 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                               {ITEM_FIELDS.map(f => (
-                                <div key={f.key} className={f.wide ? 'col-span-2' : ''}>
+                                <div key={f.key} className={f.wide ? 'sm:col-span-2' : ''}>
                                   <label className="block text-xs text-gray-600">{f.label}</label>
                                   {f.key === 'descricao' ? (
                                     <textarea
@@ -742,7 +767,7 @@ export default function DetailLicitacao() {
         )}
       </div>
 
-      <div className="mt-6 flex gap-2 items-center">
+      <div className="mt-6 flex flex-wrap gap-2 items-center">
         <button disabled={carregandoDados} onClick={() => {
           if (!printRef.current) return
           printElement(printRef.current, `Checklist — Licitação ${model.codigo}`)
@@ -756,8 +781,8 @@ export default function DetailLicitacao() {
       </div>
 
       {showPropostaModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-6 z-50">
-          <div className="bg-white rounded shadow max-w-lg w-full p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
+          <div className="bg-white rounded shadow max-w-lg w-full p-4 my-auto">
             <div className="flex justify-between items-center mb-4">
               <h4 className="font-semibold">Emitir Proposta — Licitação {model.codigo}</h4>
               <button onClick={() => setShowPropostaModal(false)} className="text-gray-500">Fechar</button>

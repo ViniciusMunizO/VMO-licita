@@ -93,14 +93,14 @@ export default function ListLicitacoes() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-semibold">Licitações</h3>
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <h3 className="text-xl sm:text-2xl font-semibold">Licitações</h3>
         <Link to="/licitacoes/novo" className="btn btn-primary">Nova Licitação</Link>
       </div>
 
       <div className="bg-white p-4 rounded shadow mb-4">
         <h4 className="font-semibold mb-2">Filtros</h4>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <input placeholder="Código" value={filters.codigo} onChange={e => setFilters({ ...filters, codigo: e.target.value })} className="p-2 rounded" />
           <input placeholder="Contratante" value={filters.contratante} onChange={e => setFilters({ ...filters, contratante: e.target.value })} className="p-2 rounded" />
           <input placeholder="Número do Pregão" value={filters.numeroPregao} onChange={e => setFilters({ ...filters, numeroPregao: e.target.value })} className="p-2 rounded" />
@@ -123,13 +123,13 @@ export default function ListLicitacoes() {
             <option value="yes">Sim</option>
             <option value="no">Não</option>
           </select>
-          <input placeholder="Busca geral (itens/observações)" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 rounded col-span-2" />
+          <input placeholder="Busca geral (itens/observações)" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 rounded sm:col-span-2" />
           <div className="flex gap-2">
             <button type="button" onClick={clearFilters} className="btn btn-ghost">Limpar</button>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <label>Ordenar por:</label>
             <select value={listOptions.sortBy} onChange={e => setListOptions({ ...listOptions, sortBy: e.target.value })} className="p-1 rounded">
               <option value="codigo">Código</option>
@@ -147,7 +147,8 @@ export default function ListLicitacoes() {
 
       <div className="bg-white p-4 rounded shadow">
         <div className="mt-4">
-          <table className="w-full table-auto">
+          <div className="table-scroll">
+          <table className="w-full table-auto min-w-[640px]">
             <thead>
               <tr className="text-left text-sm text-gray-500">
                 <th className="p-2">Código</th>
@@ -161,7 +162,13 @@ export default function ListLicitacoes() {
             <tbody>
               {paginated.map((l, i) => (
                 <tr key={i} className="border-t">
-                  <td className="p-2">{l.codigo}</td>
+                  {/* O código também abre a licitação: no celular a tabela rola
+                      na horizontal e o botão "Ver Licitação", que é a última
+                      coluna, fica fora da tela. A primeira coluna está sempre
+                      à vista. */}
+                  <td className="p-2">
+                    <Link to={`/licitacoes/${l.codigo}`} className="link-primary font-medium">{l.codigo}</Link>
+                  </td>
                   <td className="p-2">{l.ano}</td>
                   <td className="p-2">{l.contratante?.nome || l.contratado || l.empresa?.razaoSocial || '-'}</td>
                   <td className="p-2">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</td>
@@ -180,7 +187,8 @@ export default function ListLicitacoes() {
               ))}
             </tbody>
           </table>
-          <div className="mt-4 flex items-center justify-between">
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm">Página {listOptions.page} de {Math.max(1, Math.ceil(total / listOptions.pageSize))}</div>
             <div className="flex items-center gap-2">
               <button disabled={listOptions.page <= 1} onClick={() => setListOptions((o: any) => ({ ...o, page: o.page - 1 }))} className="px-3 py-1 bg-gray-100 rounded">Anterior</button>

@@ -110,8 +110,8 @@ export default function RelatorioGanhos() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4 gap-4">
-        <div className="flex items-center gap-2 flex-1 max-w-sm">
+      <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[220px] sm:max-w-sm">
           <input
             type="text"
             value={busca}
@@ -131,9 +131,9 @@ export default function RelatorioGanhos() {
         </button>
       </div>
 
-      <div className="flex items-center gap-4 mb-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
         <span className="text-sm text-gray-600">Kralen:</span>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {FILTROS_KRALEN.map(f => (
             <button
               key={f.id}
@@ -162,7 +162,7 @@ export default function RelatorioGanhos() {
           ))}
         </div>
         {periodo === 'custom' && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-gray-600">De</span>
             <DateInputBR value={dataInicioCustom} onChange={setDataInicioCustom} className="p-1.5 rounded w-32" />
             <span className="text-gray-600">até</span>
@@ -171,7 +171,13 @@ export default function RelatorioGanhos() {
         )}
       </div>
 
-      <div ref={containerRef} className="bg-white p-4 rounded shadow overflow-x-auto">
+      {/* O bloco do relatório é um documento de largura fixa, e quem rola é a
+          caixa em volta dele. O motivo é o PDF: `containerRef` é o elemento
+          que o html2canvas fotografa, então ele precisa ter a largura inteira
+          na hora da captura. Se a rolagem ficasse nele, exportar do celular
+          geraria um PDF com a tabela cortada na largura da tela. */}
+      <div className="table-scroll">
+      <div ref={containerRef} className="bg-white p-4 rounded shadow min-w-[980px]">
         <h3 className="text-xl font-bold text-center mb-1">Relatório Geral de Itens Ganhos</h3>
         <div className="text-center text-xs text-gray-500 mb-4">
           {PERIODOS.find(p => p.id === periodo)?.label}
@@ -183,7 +189,7 @@ export default function RelatorioGanhos() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-4 gap-3 mb-5">
           <div className="bg-cyan-50 border border-cyan-100 rounded p-3 text-center">
             <div className="text-xs text-gray-500">Licitações no período</div>
             <div className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>{ganhos.length}</div>
@@ -283,6 +289,7 @@ export default function RelatorioGanhos() {
             </tbody>
           </table>
         )}
+      </div>
       </div>
     </div>
   )

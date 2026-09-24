@@ -143,9 +143,9 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Bem-vindo, {user?.name}</h2>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <h2 className="text-xl sm:text-2xl font-semibold">Bem-vindo, {user?.name}</h2>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Link to="/licitacoes/novo" className="btn btn-primary">Nova Licitação</Link>
           <Link to="/licitacoes" className="btn btn-ghost">Ver todas</Link>
           <button onClick={logout} className="btn btn-ghost text-sm">Sair</button>
@@ -195,12 +195,12 @@ export default function Dashboard() {
                   </p>
                   <ul className="space-y-2">
                     {aguardando.map((l, i) => (
-                      <li key={`${l.codigo}-${i}`} className="flex justify-between items-center text-sm border-t pt-2 first:border-t-0 first:pt-0">
-                        <div>
+                      <li key={`${l.codigo}-${i}`} className="flex justify-between items-center gap-3 text-sm border-t pt-2 first:border-t-0 first:pt-0">
+                        <div className="min-w-0">
                           <Link to={`/licitacoes/${l.codigo}`} className="link-primary font-medium">{contratanteNome(l)}</Link>
                           <div className="text-gray-500">Código {l.codigo} • {l.tipoObjeto || 'Sem tipo'}</div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex-shrink-0">
                           <div className="text-gray-600">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</div>
                           <div className="text-xs font-medium" style={{ color: 'var(--color-error)' }}>
                             {haQuantoTempo(l, now)}
@@ -225,12 +225,12 @@ export default function Dashboard() {
               ) : (
                 <ul className="space-y-2">
                   {proximas.map((l, i) => (
-                    <li key={`${l.codigo}-${i}`} className="flex justify-between items-center text-sm border-t pt-2 first:border-t-0 first:pt-0">
-                      <div>
+                    <li key={`${l.codigo}-${i}`} className="flex justify-between items-center gap-3 text-sm border-t pt-2 first:border-t-0 first:pt-0">
+                      <div className="min-w-0">
                         <Link to={`/licitacoes/${l.codigo}`} className="link-primary font-medium">{contratanteNome(l)}</Link>
                         <div className="text-gray-500">Código {l.codigo} • {l.tipoObjeto || 'Sem tipo'}</div>
                       </div>
-                      <div className="text-gray-600">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</div>
+                      <div className="text-gray-600 flex-shrink-0">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</div>
                     </li>
                   ))}
                 </ul>
@@ -241,12 +241,12 @@ export default function Dashboard() {
               <h4 className="font-semibold mb-3">Últimas adicionadas</h4>
               <ul className="space-y-2">
                 {recentes.map((l, i) => (
-                  <li key={`${l.codigo}-${i}`} className="flex justify-between items-center text-sm border-t pt-2 first:border-t-0 first:pt-0">
-                    <div>
+                  <li key={`${l.codigo}-${i}`} className="flex justify-between items-center gap-3 text-sm border-t pt-2 first:border-t-0 first:pt-0">
+                    <div className="min-w-0">
                       <Link to={`/licitacoes/${l.codigo}`} className="link-primary font-medium">{contratanteNome(l)}</Link>
                       <div className="text-gray-500">Código {l.codigo} • Ano {l.ano}</div>
                     </div>
-                    <div className="text-gray-600">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</div>
+                    <div className="text-gray-600 flex-shrink-0">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</div>
                   </li>
                 ))}
               </ul>

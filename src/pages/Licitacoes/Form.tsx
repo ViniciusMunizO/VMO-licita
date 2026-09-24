@@ -46,6 +46,8 @@ export default function FormLicitacao() {
   const [showAttachmentsModal, setShowAttachmentsModal] = useState(false)
   const [showItemsImportModal, setShowItemsImportModal] = useState(false)
   const [showContractorModal, setShowContractorModal] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [erroSalvar, setErroSalvar] = useState('')
   const [contratantes, setContratantes] = useState<any[]>([])
   const [habilitacao, setHabilitacao] = useState<any>({
     habilitacaoJuridica: false,
@@ -95,16 +97,27 @@ export default function FormLicitacao() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErroSalvar('')
+    setSalvando(true)
     const record: any = { ...modelo, criadoPor: user?.name, contratante: selectedContratante || { nome: modelo.contratado }, habilitacao }
     // O código final quem define é a coluna identity do Postgres (nunca
     // colide, mesmo com dois cadastros simultâneos) — o `codigo` calculado
     // em memória (previewNextCodigo) era só uma prévia pra exibir na tela.
-    const saved = isEditing ? await updateLicitacao(modelo.codigo, record) : await createLicitacao(record)
+    //
+    // O erro do banco vira aviso na tela em vez de promise rejeitada sem dono:
+    // sem isto, salvar com o Supabase fora do ar não navegava e não dizia nada,
+    // e o usuário ficava clicando em Salvar achando que o botão travou.
     try {
-      const userName = localStorage.getItem('user_name') || undefined
-      await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: saved.codigo }, userName)
-    } catch (err) { /* ignore */ }
-    nav('/licitacoes')
+      const saved = isEditing ? await updateLicitacao(modelo.codigo, record) : await createLicitacao(record)
+      try {
+        const userName = localStorage.getItem('user_name') || undefined
+        await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: saved.codigo }, userName)
+      } catch (err) { /* auditoria nunca trava o salvamento */ }
+      nav('/licitacoes')
+    } catch (err: any) {
+      setErroSalvar(err?.message || 'Não foi possível salvar a licitação.')
+      setSalvando(false)
+    }
   }
 
   // audit on save
@@ -115,10 +128,10 @@ export default function FormLicitacao() {
   }, [])
 
   return (
-    <div className="bg-white p-6 rounded shadow max-w-5xl mx-auto">
+    <div className="bg-white p-4 sm:p-6 rounded shadow max-w-5xl mx-auto">
       <h3 className="text-xl font-semibold mb-4">{isEditing ? `Editar Licitação ${modelo.codigo}` : 'Nova Licitação'}</h3>
       <form onSubmit={save} className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-gray-600">Código</label>
             <input value={modelo.codigo} readOnly className="w-full p-2 bg-gray-100 rounded readonly-field" />
@@ -144,13 +157,17 @@ export default function FormLicitacao() {
 
         <div>
           <label className="block text-sm text-gray-600">Contratante</label>
+          {/* Input e botão lado a lado, não sobrepostos. O botão ficava
+              posicionado por cima do campo, e o nome do município digitado
+              passava por baixo dele — no celular sobrava menos da metade do
+              campo visível. Abaixo de 640px ele desce pra linha de baixo. */}
           <div className="relative">
-            <input placeholder="Município" value={selectedContratante ? `${selectedContratante.nome} / ${selectedContratante.uf}` : (modelo.contratado || '')} onChange={e => {
-              setModelo({ ...modelo, contratado: e.target.value })
-              setSelectedContratante(null)
-            }} className="w-full p-2 rounded" onFocus={() => setContratanteFocused(true)} onBlur={() => setContratanteFocused(false)} />
-            <div className="absolute right-2 top-2">
-              <button type="button" onClick={() => setShowContractorModal(true)} className="btn btn-ghost">Selecionar/Cadastrar</button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input placeholder="Município" value={selectedContratante ? `${selectedContratante.nome} / ${selectedContratante.uf}` : (modelo.contratado || '')} onChange={e => {
+                setModelo({ ...modelo, contratado: e.target.value })
+                setSelectedContratante(null)
+              }} className="w-full p-2 rounded" onFocus={() => setContratanteFocused(true)} onBlur={() => setContratanteFocused(false)} />
+              <button type="button" onClick={() => setShowContractorModal(true)} className="btn btn-ghost flex-shrink-0 justify-center whitespace-nowrap">Selecionar/Cadastrar</button>
             </div>
               {/* suggestions */}
               {contratanteFocused && !selectedContratante && String(modelo.contratado || '').trim().length > 0 && (
@@ -177,7 +194,7 @@ export default function FormLicitacao() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-gray-600">Número do Pregão</label>
             <input value={(modelo as any).numeroPregao || ''} onChange={e => setModelo({ ...modelo, numeroPregao: e.target.value })} className="w-full p-2 rounded" />
@@ -188,7 +205,7 @@ export default function FormLicitacao() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-gray-600">Portal Eletrônico</label>
             <input value={(modelo as any).portal || ''} onChange={e => setModelo({ ...modelo, portal: e.target.value })} className="w-full p-2 rounded" />
@@ -231,7 +248,7 @@ export default function FormLicitacao() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-gray-600">Tipo de disputa</label>
             <select value={(modelo as any).tipoDisputa || ''} onChange={e => setModelo({ ...modelo, tipoDisputa: e.target.value })} className="w-full p-2 rounded">
@@ -254,7 +271,7 @@ export default function FormLicitacao() {
 
         <div className="mt-2 bg-white border rounded p-4">
           <h4 className="font-semibold mb-3">Proposta</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-600">Validade da Proposta</label>
               <input value={(modelo as any).prazoValidade || ''} onChange={e => setModelo({ ...modelo, prazoValidade: e.target.value })} className="w-full p-2 rounded" />
@@ -284,7 +301,7 @@ export default function FormLicitacao() {
 
         <div className="mt-6 bg-white border rounded p-4">
           <h4 className="font-semibold mb-2">Habilitação (Checklist)</h4>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.habilitacaoJuridica} onChange={e => setHabilitacao({ ...habilitacao, habilitacaoJuridica: e.target.checked })} /> Habilitação Jurídica</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.habilitacaoFiscal} onChange={e => setHabilitacao({ ...habilitacao, habilitacaoFiscal: e.target.checked })} /> Habilitação Fiscal, Social e Trabalhista</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.balanco} onChange={e => setHabilitacao({ ...habilitacao, balanco: e.target.checked })} /> Balanço</label>
@@ -306,8 +323,16 @@ export default function FormLicitacao() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <button className="btn btn-primary" type="submit">Salvar</button>
+        {erroSalvar && (
+          <div className="p-3 rounded text-sm" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>
+            {erroSalvar}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button className="btn btn-primary disabled:opacity-50" type="submit" disabled={salvando}>
+            {salvando ? 'Salvando...' : 'Salvar'}
+          </button>
           <button type="button" onClick={() => setShowAttachmentsModal(true)} className="btn btn-ghost">Anexos</button>
           <button type="button" onClick={() => setShowItemsImportModal(true)} className="btn btn-ghost">Importar Itens</button>
         </div>

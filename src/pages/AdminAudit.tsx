@@ -12,14 +12,14 @@ export default function AdminAudit() {
   }, [])
 
   return (
-    <div className="bg-white p-6 rounded shadow max-w-5xl">
+    <div className="bg-white p-4 sm:p-6 rounded shadow max-w-5xl">
       <h3 className="text-xl font-semibold mb-4">Registro de Auditoria</h3>
       <div className="max-h-96 overflow-auto border rounded p-2">
         {logs.length === 0 && <div className="text-sm text-gray-500">Nenhum log de auditoria.</div>}
         {logs.map((l: any) => (
           <div key={l.id} className="p-2 border-b">
             <div className="text-sm text-gray-700">{formatEpochBR(l.at)} — <strong>{l.action}</strong> — {l.user || 'desconhecido'}</div>
-            <pre className="text-xs mt-1 bg-gray-50 p-2 rounded">{JSON.stringify(l.payload, null, 2)}</pre>
+            <pre className="text-xs mt-1 bg-gray-50 p-2 rounded overflow-x-auto">{JSON.stringify(l.payload, null, 2)}</pre>
           </div>
         ))}
       </div>

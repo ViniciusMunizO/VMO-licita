@@ -27,14 +27,14 @@ export default function ContractorModal({ open, onClose, onSelect }: { open: boo
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-6 z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
       <div className="bg-white rounded shadow max-w-2xl w-full p-4">
         <div className="flex justify-between items-center mb-4">
           <h4 className="font-semibold">Contratantes (Municípios)</h4>
           <button onClick={onClose} className="text-gray-500">Fechar</button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <h5 className="font-semibold mb-2">Cadastrar novo</h5>
             <form onSubmit={save} className="space-y-2">

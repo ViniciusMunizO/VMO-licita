@@ -18,16 +18,16 @@ export default function RelatoriosIndex() {
 
   return (
     <div>
-      <h3 className="text-2xl font-semibold mb-4">Relatórios</h3>
+      <h3 className="text-xl sm:text-2xl font-semibold mb-4">Relatórios</h3>
 
-      <div className="flex gap-2 mb-6 border-b">
+      <div className="flex gap-2 mb-6 border-b table-scroll">
         {TIPOS.map(t => (
           <button
             key={t.id}
             type="button"
             disabled={!t.disponivel}
             onClick={() => setTipo(t.id)}
-            className={`px-4 py-2 text-sm border-b-2 -mb-px ${
+            className={`px-4 py-2 text-sm border-b-2 -mb-px whitespace-nowrap flex-shrink-0 ${
               tipo === t.id
                 ? 'border-current font-semibold'
                 : 'border-transparent text-gray-500'

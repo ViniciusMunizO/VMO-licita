@@ -109,7 +109,7 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-6 z-50 overflow-auto">
+    <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-auto">
       <div className="bg-white rounded shadow max-w-xl w-full p-4">
         <div className="flex justify-between items-center mb-4">
           <h4 className="font-semibold">Nova Ata / Contrato</h4>
@@ -129,7 +129,7 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
             <input value={numero} onChange={e => setNumero(e.target.value)} className="w-full p-2 rounded" required />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-gray-600">Início da Vigência</label>
               <DateInputBR value={inicioVigencia} onChange={handleInicioChange} className="w-full p-2 rounded" />

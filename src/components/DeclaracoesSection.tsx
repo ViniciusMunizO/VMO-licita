@@ -108,7 +108,7 @@ export default function DeclaracoesSection({ modelo }: { modelo: any }) {
       </div>
 
       {showCustom && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-6 z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
           <div className="bg-white rounded shadow max-w-2xl w-full p-4">
             <div className="flex justify-between items-center mb-4">
               <h4 className="font-semibold">Declaração Personalizada</h4>

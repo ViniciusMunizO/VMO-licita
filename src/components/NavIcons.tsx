@@ -45,3 +45,22 @@ export function IconUsuarios() {
     </svg>
   )
 }
+
+// Abrir/fechar o menu principal quando ele vira gaveta, abaixo de `lg`.
+// Um pouco maiores que os demais (22px): aqui o ícone é o alvo do dedo, não
+// um enfeite ao lado de um rótulo.
+export function IconMenu() {
+  return (
+    <svg {...base} width={22} height={22}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  )
+}
+
+export function IconFechar() {
+  return (
+    <svg {...base} width={22} height={22}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  )
+}

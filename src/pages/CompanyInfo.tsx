@@ -70,7 +70,7 @@ export default function CompanyInfo() {
   if (loading) return <div className="text-sm text-gray-500">Carregando...</div>
 
   return (
-    <div className="bg-white p-6 rounded shadow max-w-5xl mx-auto">
+    <div className="bg-white p-4 sm:p-6 rounded shadow max-w-5xl mx-auto">
       <h3 className="text-xl font-semibold mb-1">Informações da Empresa</h3>
       <p className="text-sm text-gray-500 mb-4">Esses dados são usados automaticamente nos documentos emitidos pelo sistema.</p>
 
@@ -80,7 +80,7 @@ export default function CompanyInfo() {
           <input value={form.razaoSocial} onChange={set('razaoSocial')} className="w-full p-2 rounded" />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-gray-600">CNPJ</label>
             <input value={form.cnpj} onChange={set('cnpj')} className="w-full p-2 rounded" />
@@ -100,7 +100,7 @@ export default function CompanyInfo() {
           <input value={form.endereco} onChange={set('endereco')} className="w-full p-2 rounded" />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-gray-600">CEP</label>
             <input value={form.cep} onChange={set('cep')} className="w-full p-2 rounded" />
@@ -115,7 +115,7 @@ export default function CompanyInfo() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-gray-600">Telefone</label>
             <input value={form.telefone} onChange={set('telefone')} className="w-full p-2 rounded" />
@@ -127,7 +127,7 @@ export default function CompanyInfo() {
         </div>
 
         <div className="mt-6 bg-white border rounded p-4">
-          <div className="flex justify-between items-center mb-3">
+          <div className="flex flex-wrap justify-between items-start gap-3 mb-3">
             <div>
               <h4 className="font-semibold">Contas Bancárias</h4>
               <p className="text-sm text-gray-500">Cadastre quantas contas precisar — na licitação você escolhe qual delas entra na Proposta e nas Declarações.</p>
@@ -146,7 +146,7 @@ export default function CompanyInfo() {
           ) : (
             <div className="space-y-3">
               {form.bancos.map((conta, idx) => (
-                <div key={conta.id} className="grid grid-cols-4 gap-3 items-end border-t pt-3 first:border-t-0 first:pt-0">
+                <div key={conta.id} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end border-t pt-3 first:border-t-0 first:pt-0">
                   <div>
                     <label className="block text-sm text-gray-600">Apelido</label>
                     <input
@@ -211,7 +211,7 @@ export default function CompanyInfo() {
 
         <div className="mt-6 bg-white border rounded p-4">
           <h4 className="font-semibold mb-3">Dados para Assinatura do Contrato</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-600">Nome do Representante Legal</label>
               <input value={form.representanteNome} onChange={set('representanteNome')} className="w-full p-2 rounded" />
@@ -243,7 +243,7 @@ export default function CompanyInfo() {
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button className="btn btn-primary" type="submit">Salvar</button>
           {savedAt && <span className="text-sm text-green-600">Informações salvas.</span>}
         </div>

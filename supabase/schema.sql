@@ -1,9 +1,12 @@
 -- Botti Licita — schema Postgres/Supabase
 --
 -- Script de provisionamento: roda inteiro, uma vez, num projeto Supabase
--- novo (Dashboard -> SQL Editor -> cola e executa). Cada cliente vendido
--- ganha seu próprio projeto Supabase rodando esse mesmo script — não é uma
--- plataforma multi-tenant, é "uma instância por cliente" (decisão já tomada).
+-- novo (Dashboard -> SQL Editor -> cola e executa). Depois dele, rode os
+-- arquivos de `supabase/migrations/` em ordem numérica.
+--
+-- Cada cliente vendido ganha seu próprio projeto Supabase rodando esse
+-- mesmo script — não é uma plataforma multi-tenant, é "uma instância por
+-- cliente" (decisão já tomada).
 --
 -- Nomes de coluna em camelCase (entre aspas) de propósito: o app já usa
 -- esses nomes exatos em centenas de lugares (`licitacao.numeroPregao`,
