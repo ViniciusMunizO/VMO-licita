@@ -12,6 +12,7 @@ import PrintableProposta from '../../components/PrintableProposta'
 import { setLancadoNoKralen } from '../../utils/kralen'
 import { getLicitacao, updateLicitacao } from '../../utils/licitacoes'
 import { listItems, updateItem } from '../../utils/items'
+import { MOTIVOS_DESCLASSIFICACAO, parseMotivo, formatMotivo } from '../../utils/itens'
 import { listAttachments, getAttachmentData } from '../../utils/attachments'
 import { uploadAnexo, removerDoStorage, urlAssinada } from '../../utils/arquivo'
 import { listAtas, addAta, removeAta as removeAtaApi } from '../../utils/atas'
@@ -264,7 +265,7 @@ export default function DetailLicitacao() {
     } catch (err) { /* ignore */ }
   }
 
-  const [motivoDraft, setMotivoDraft] = useState<Record<number, string>>({})
+  const [motivoDraft, setMotivoDraft] = useState<Record<number, { categoria: string; detalhe: string }>>({})
   const [editingMotivoIdx, setEditingMotivoIdx] = useState<number | null>(null)
 
   // Desclassificar e Vencedor são mutuamente exclusivos — um item desclassificado
@@ -286,8 +287,9 @@ export default function DetailLicitacao() {
     setItems(list)
   }
 
-  const saveMotivo = async (idx: number, motivo: string) => {
-    const motivoLimitado = motivo.slice(0, MOTIVO_MAX_LENGTH)
+  const saveMotivo = async (idx: number) => {
+    const draft = motivoDraft[idx] ?? parseMotivo(items[idx].motivoDesclassificacao || '')
+    const motivoLimitado = formatMotivo(draft.categoria, draft.detalhe).slice(0, MOTIVO_MAX_LENGTH)
     const atualizado = await updateItem(items[idx].id, { motivoDesclassificacao: motivoLimitado })
     const list = [...items]; list[idx] = atualizado
     setItems(list)
@@ -611,31 +613,42 @@ export default function DetailLicitacao() {
                         </td>
                         <td className="p-2" onClick={e => e.stopPropagation()}>
                           {it.desclassificado ? (
-                            editingMotivoIdx === idx || !it.motivoDesclassificacao ? (
-                              <div className="flex items-center gap-1">
-                                <div className="flex flex-col">
-                                  <input
-                                    type="text"
-                                    placeholder="Motivo da desclassificação"
-                                    autoFocus={editingMotivoIdx === idx}
-                                    maxLength={MOTIVO_MAX_LENGTH}
-                                    value={motivoDraft[idx] ?? it.motivoDesclassificacao ?? ''}
-                                    onChange={e => setMotivoDraft(d => ({ ...d, [idx]: e.target.value }))}
-                                    onKeyDown={e => { if (e.key === 'Enter') saveMotivo(idx, (e.target as HTMLInputElement).value) }}
-                                    className="w-48 p-1 rounded text-sm"
-                                  />
-                                  <span className="text-[10px] text-gray-400 mt-0.5">
-                                    {(motivoDraft[idx] ?? it.motivoDesclassificacao ?? '').length}/{MOTIVO_MAX_LENGTH}
-                                  </span>
+                            editingMotivoIdx === idx || !it.motivoDesclassificacao ? (() => {
+                              const motivoAtual = motivoDraft[idx] ?? parseMotivo(it.motivoDesclassificacao || '')
+                              return (
+                                <div className="flex items-start gap-1">
+                                  <div className="flex flex-col gap-1">
+                                    <select
+                                      autoFocus={editingMotivoIdx === idx}
+                                      value={motivoAtual.categoria}
+                                      onChange={e => setMotivoDraft(d => ({ ...d, [idx]: { categoria: e.target.value, detalhe: motivoAtual.detalhe } }))}
+                                      className="w-48 p-1 rounded text-sm"
+                                    >
+                                      <option value="" disabled>Selecione o motivo</option>
+                                      {MOTIVOS_DESCLASSIFICACAO.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    {motivoAtual.categoria === 'Outro' && (
+                                      <input
+                                        type="text"
+                                        placeholder="Detalhar o motivo"
+                                        maxLength={MOTIVO_MAX_LENGTH}
+                                        value={motivoAtual.detalhe}
+                                        onChange={e => setMotivoDraft(d => ({ ...d, [idx]: { categoria: 'Outro', detalhe: e.target.value } }))}
+                                        onKeyDown={e => { if (e.key === 'Enter') saveMotivo(idx) }}
+                                        className="w-48 p-1 rounded text-sm"
+                                      />
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => saveMotivo(idx)}
+                                    disabled={!motivoAtual.categoria}
+                                    className="btn btn-primary text-xs px-2 py-1 disabled:opacity-50"
+                                  >
+                                    OK
+                                  </button>
                                 </div>
-                                <button
-                                  onClick={() => saveMotivo(idx, motivoDraft[idx] ?? it.motivoDesclassificacao ?? '')}
-                                  className="btn btn-primary text-xs px-2 py-1"
-                                >
-                                  OK
-                                </button>
-                              </div>
-                            ) : (
+                              )
+                            })() : (
                               <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-800 break-words" title={it.motivoDesclassificacao}>
                                   {it.motivoDesclassificacao.length > 40 ? it.motivoDesclassificacao.slice(0, 40) + '…' : it.motivoDesclassificacao}

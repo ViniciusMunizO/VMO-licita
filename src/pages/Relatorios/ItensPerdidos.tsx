@@ -7,6 +7,7 @@ import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed } from '../../utils/format'
 import { agruparPorLote, somaColuna } from '../../utils/itens'
 import { exportElementsToPdf } from '../../utils/pdf'
+import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
 
@@ -96,6 +97,27 @@ export default function RelatorioItensPerdidos() {
 
   const todosItensPerdidos = perdidos.flatMap(g => g.itensPerdidos)
 
+  const exportarExcel = () => {
+    const linhas = perdidos.flatMap(({ licitacao: l, itensPerdidos }) =>
+      itensPerdidos.map((it: any) => ({
+        Licitação: l.codigo,
+        Data: formatDateTimeBR(l.dataLicitacao, l.horaLicitacao).split(' ')[0],
+        Hora: l.horaLicitacao || '',
+        Órgão: contratanteNome(l),
+        UF: contratanteUf(l),
+        Pregão: l.numeroPregao || '',
+        Lote: it.lote || '',
+        Item: it.item ?? '',
+        Descrição: it.descricao || '',
+        Marca: it.marca || '',
+        Quantidade: Number(it.quantidade) || 0,
+        Custo: Number(it.totalCusto) || 0,
+        Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
+      }))
+    )
+    exportRowsToExcel(linhas, 'relatorio_itens_perdidos.xlsx', 'Itens Perdidos')
+  }
+
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
@@ -111,12 +133,15 @@ export default function RelatorioItensPerdidos() {
             <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
           )}
         </div>
-        <button
-          onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_perdidos.pdf', 'Relatório Geral de Itens Perdidos', 'landscape')}
-          className="btn btn-primary"
-        >
-          Exportar (PDF)
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportarExcel} className="btn btn-ghost">Exportar (Excel)</button>
+          <button
+            onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_perdidos.pdf', 'Relatório Geral de Itens Perdidos', 'landscape')}
+            className="btn btn-primary"
+          >
+            Exportar (PDF)
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">

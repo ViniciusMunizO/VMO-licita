@@ -4,10 +4,11 @@ import { listLicitacoes } from '../../utils/licitacoes'
 import { listItems } from '../../utils/items'
 import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
-import { formatNumeric, formatFixed } from '../../utils/format'
+import { formatNumeric, formatFixed, formatMoneyBRL, margemPercentual } from '../../utils/format'
 import { agruparPorLote, somaColuna } from '../../utils/itens'
 import { setLancadoNoKralen } from '../../utils/kralen'
 import { exportElementsToPdf } from '../../utils/pdf'
+import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
 
@@ -16,23 +17,12 @@ type LicitacaoGanha = {
   itensVencedores: any[]
 }
 
-function formatMoneyBRL(value: number): string {
-  return `R$ ${formatFixed(value)}`
-}
-
 function contratanteNome(l: any) {
   return l.contratante?.nome || l.contratado || l.empresa?.razaoSocial || 'Sem contratante'
 }
 
 function contratanteUf(l: any) {
   return l.contratante?.uf || ''
-}
-
-// % de margem sobre o custo, na mesma fórmula do relatório real do sistema
-// atual (ex.: Vlr Ganho 24.697,53 / Custo 20.280,00 → 21,78%).
-function margemPercentual(valorGanho: number, custo: number): number | null {
-  if (!custo) return null
-  return (valorGanho / custo - 1) * 100
 }
 
 const COLS: { width: string }[] = [
@@ -108,6 +98,28 @@ export default function RelatorioGanhos() {
   const totalGanhoGeral = somaColuna(todosItensVencedores, 'valorGanho')
   const margemGeralValor = margemPercentual(totalGanhoGeral, totalCustoGeral)
 
+  const exportarExcel = () => {
+    const linhas = ganhos.flatMap(({ licitacao: l, itensVencedores }) =>
+      itensVencedores.map((it: any) => ({
+        Licitação: l.codigo,
+        Data: formatDateTimeBR(l.dataLicitacao, l.horaLicitacao).split(' ')[0],
+        Órgão: contratanteNome(l),
+        UF: contratanteUf(l),
+        Pregão: l.numeroPregao || '',
+        Lote: it.lote || '',
+        Item: it.item ?? '',
+        Descrição: it.descricao || '',
+        Marca: it.marca || '',
+        Quantidade: Number(it.quantidade) || 0,
+        Custo: Number(it.totalCusto) || 0,
+        'Valor Ganho': Number(it.valorGanho) || 0,
+        'Margem %': margemPercentual(Number(it.valorGanho) || 0, Number(it.totalCusto) || 0) ?? '',
+        Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
+      }))
+    )
+    exportRowsToExcel(linhas, 'relatorio_itens_ganhos.xlsx', 'Itens Ganhos')
+  }
+
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
@@ -123,12 +135,15 @@ export default function RelatorioGanhos() {
             <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
           )}
         </div>
-        <button
-          onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_ganhos.pdf', 'Relatório Geral de Itens Ganhos', 'landscape')}
-          className="btn btn-primary"
-        >
-          Exportar (PDF)
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportarExcel} className="btn btn-ghost">Exportar (Excel)</button>
+          <button
+            onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_ganhos.pdf', 'Relatório Geral de Itens Ganhos', 'landscape')}
+            className="btn btn-primary"
+          >
+            Exportar (PDF)
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">

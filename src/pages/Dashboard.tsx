@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import { listLicitacoes } from '../utils/licitacoes'
 import { listItems } from '../utils/items'
 import { combineDateTime, formatDateTimeBR } from '../utils/date'
+import { formatMoneyBRL, margemPercentual, formatFixed } from '../utils/format'
+import { listDocumentosEmpresa, diasParaVencer, DocumentoEmpresa } from '../utils/documentos'
 
 type Licitacao = {
   codigo: number
@@ -75,6 +77,8 @@ export default function Dashboard() {
   const { user, logout } = useAuth()
   const [licitacoes, setLicitacoes] = useState<Licitacao[]>([])
   const [itemCounts, setItemCounts] = useState({ total: 0, vencedores: 0 })
+  const [financeiro, setFinanceiro] = useState({ totalGanho: 0, totalCustoGanho: 0, totalEmAberto: 0 })
+  const [documentosVencendo, setDocumentosVencendo] = useState<DocumentoEmpresa[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -88,15 +92,46 @@ export default function Dashboard() {
       if (!mounted) return
       let total = 0
       let vencedores = 0
-      for (const items of itemLists) {
-        if (!Array.isArray(items)) continue
+      let totalGanho = 0
+      let totalCustoGanho = 0
+      let totalEmAberto = 0
+      list.forEach((l, i) => {
+        const items = itemLists[i]
+        if (!Array.isArray(items)) return
         total += items.length
-        vencedores += items.filter((it: any) => it?.vencedor).length
-      }
+        for (const it of items) {
+          if (it?.vencedor) {
+            vencedores++
+            totalGanho += Number(it.valorGanho) || 0
+            totalCustoGanho += Number(it.totalCusto) || 0
+          } else if (!l.status) {
+            // Licitação ainda sem resultado: o mínimo cotado é o valor "em
+            // jogo" nesses itens até sair o resultado.
+            totalEmAberto += Number(it.valorTotalMinimo) || 0
+          }
+        }
+      })
       setItemCounts({ total, vencedores })
+      setFinanceiro({ totalGanho, totalCustoGanho, totalEmAberto })
       setLoading(false)
     }
     load()
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    const hoje = new Date().toISOString().slice(0, 10)
+    listDocumentosEmpresa().then(docs => {
+      if (!mounted) return
+      const vencendo = docs
+        .filter(d => d.dataValidade)
+        .map(d => ({ doc: d, dias: diasParaVencer(d.dataValidade, hoje) }))
+        .filter((x): x is { doc: DocumentoEmpresa; dias: number } => x.dias !== null && x.dias <= 30)
+        .sort((a, b) => a.dias - b.dias)
+        .map(x => x.doc)
+      setDocumentosVencendo(vencendo)
+    }).catch(() => { /* card de documentos é informativo, não trava o resto do Dashboard */ })
     return () => { mounted = false }
   }, [])
 
@@ -152,6 +187,34 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {documentosVencendo.length > 0 && (
+        <div className="bg-white p-4 rounded shadow mb-6 border-l-4" style={{ borderColor: 'var(--color-error)' }}>
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="font-semibold">Documentos vencendo</h4>
+            <span
+              className="text-xs font-semibold text-white px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'var(--color-error)' }}
+            >
+              {documentosVencendo.length}
+            </span>
+          </div>
+          <ul className="space-y-2">
+            {documentosVencendo.map(d => {
+              const dias = diasParaVencer(d.dataValidade, new Date().toISOString().slice(0, 10))!
+              return (
+                <li key={d.id} className="flex justify-between items-center gap-3 text-sm border-t pt-2 first:border-t-0 first:pt-0">
+                  <span className="text-gray-700">{d.tipo}{d.numero ? ` — ${d.numero}` : ''}</span>
+                  <span className="text-xs font-medium flex-shrink-0" style={{ color: dias < 0 ? 'var(--color-error)' : '#b45309' }}>
+                    {dias < 0 ? `Venceu há ${Math.abs(dias)} dia(s)` : dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia(s)`}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          <Link to="/empresa" className="text-xs link-primary mt-3 inline-block">Ver documentos da empresa</Link>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-sm text-gray-500">Carregando...</div>
       ) : licitacoes.length === 0 ? (
@@ -166,6 +229,19 @@ export default function Dashboard() {
             <StatTile label={`Cadastradas em ${currentYear}`} value={stats.thisYear} />
             <StatTile label="Próximas licitações" value={stats.proximas.length} />
             <StatTile label="Itens cadastrados" value={itemCounts.total} />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <StatTile label="Valor total ganho" value={formatMoneyBRL(financeiro.totalGanho)} />
+            <StatTile label="Custo dos ganhos" value={formatMoneyBRL(financeiro.totalCustoGanho)} />
+            <StatTile
+              label="Margem dos ganhos"
+              value={(() => {
+                const m = margemPercentual(financeiro.totalGanho, financeiro.totalCustoGanho)
+                return m === null ? '-' : `${formatFixed(m)}%`
+              })()}
+            />
+            <StatTile label="Em jogo (aguardando resultado)" value={formatMoneyBRL(financeiro.totalEmAberto)} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

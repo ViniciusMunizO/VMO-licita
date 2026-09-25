@@ -27,7 +27,7 @@ export function formatarTamanho(bytes: number | null | undefined): string {
 // O nome vira parte da chave do objeto: acento, espaço e sinal solto atrapalham
 // tanto a chave quanto o link assinado. O nome original continua na coluna
 // `filename`, que é o que aparece na tela e no download.
-function sanitizarNome(nome: string): string {
+export function sanitizarNome(nome: string): string {
   return nome
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
@@ -48,6 +48,18 @@ export async function uploadAnexo(f: File, prefixo: string): Promise<AnexoEnviad
   })
   if (error) throw new Error(`Não consegui enviar o arquivo: ${error.message}`)
   return { path, filename: f.name, mime: f.type || 'application/octet-stream', size: f.size }
+}
+
+// Copia um objeto já existente no bucket pra um novo caminho, com nome novo
+// (uuid) — usado por "Anexar da empresa": cada licitação precisa da sua
+// própria cópia porque remover um anexo apaga o objeto do Storage
+// (`removerDoStorage`), e isso não pode levar junto o documento original
+// da empresa nem os anexos de outras licitações que usaram o mesmo documento.
+export async function copiarNoStorage(pathOrigem: string, prefixoDestino: string, nomeOriginal: string, mime: string, size: number): Promise<AnexoEnviado> {
+  const path = `${prefixoDestino}/${crypto.randomUUID()}-${sanitizarNome(nomeOriginal)}`
+  const { error } = await supabase.storage.from(BUCKET_ANEXOS).copy(pathOrigem, path)
+  if (error) throw new Error(`Não consegui copiar o arquivo: ${error.message}`)
+  return { path, filename: nomeOriginal, mime, size }
 }
 
 export async function urlAssinada(path: string, baixarComo?: string): Promise<string> {

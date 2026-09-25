@@ -77,6 +77,33 @@ alter table empresa_info drop column if exists agencia;
 alter table empresa_info drop column if exists conta;
 
 -- ============================================================
+-- documentos_empresa — certidões/documentos da empresa com data de validade
+-- (CND, CRF do FGTS, contrato social, atestados etc.), fora do escopo de
+-- uma licitação específica. Dois usos: alertar no Dashboard quando algo
+-- está vencendo, e servir de "cofre" pra anexar de novo em cada licitação
+-- nova sem precisar re-subir o mesmo arquivo toda vez.
+-- ============================================================
+create table if not exists documentos_empresa (
+  id uuid primary key default gen_random_uuid(),
+  tipo text not null,
+  numero text,
+  "dataEmissao" text,
+  -- Vazio = documento sem validade (ex.: contrato social). Só entra no
+  -- alerta de vencimento quando preenchida.
+  "dataValidade" text,
+  -- Aparece como opção em "Anexar da empresa" na licitação quando true.
+  reutilizavel boolean not null default true,
+  observacao text,
+  path text,
+  filename text,
+  mime text,
+  size bigint,
+  "criadoPor" text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ============================================================
 -- licitacoes
 -- ============================================================
 create table if not exists licitacoes (
@@ -227,6 +254,7 @@ create table if not exists audit_logs (
 alter table profiles enable row level security;
 alter table contratantes enable row level security;
 alter table empresa_info enable row level security;
+alter table documentos_empresa enable row level security;
 alter table licitacoes enable row level security;
 alter table items enable row level security;
 alter table attachments enable row level security;
@@ -306,6 +334,9 @@ create policy "membro ativo tudo em contratantes" on contratantes for all using 
 drop policy if exists "autenticado tudo em empresa_info" on empresa_info;
 drop policy if exists "membro ativo tudo em empresa_info" on empresa_info;
 create policy "membro ativo tudo em empresa_info" on empresa_info for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+drop policy if exists "membro ativo tudo em documentos_empresa" on documentos_empresa;
+create policy "membro ativo tudo em documentos_empresa" on documentos_empresa for all using (public.membro_ativo()) with check (public.membro_ativo());
 
 drop policy if exists "autenticado tudo em licitacoes" on licitacoes;
 drop policy if exists "membro ativo tudo em licitacoes" on licitacoes;

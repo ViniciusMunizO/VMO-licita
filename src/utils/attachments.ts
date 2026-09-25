@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient'
-import { uploadAnexo, removerDoStorage } from './arquivo'
+import { uploadAnexo, removerDoStorage, copiarNoStorage } from './arquivo'
 
 // Nunca traz a coluna `data` (base64 dos anexos antigos, anteriores ao
 // Storage): listar anexo é listar nome e tamanho, e arrastar o conteúdo de
@@ -35,6 +35,30 @@ export async function addAttachment(licitacaoCodigo: number | string, att: { nam
     // O arquivo já subiu; sem a linha ele viraria lixo invisível no bucket,
     // sem nenhuma tela por onde alguém pudesse achá-lo depois.
     await removerDoStorage([enviado.path]).catch(() => { /* o erro do insert é o que importa */ })
+    throw error
+  }
+  return listAttachments(licitacaoCodigo)
+}
+
+// Reaproveita um documento do cofre da empresa (`documentos_empresa`) como
+// anexo desta licitação. Copia o arquivo pra um caminho novo em vez de
+// apontar pro mesmo objeto — sem isso, remover este anexo depois apagaria o
+// documento original do Storage (`removeAttachment` chama `removerDoStorage`).
+export async function addAttachmentFromDocumento(
+  licitacaoCodigo: number | string,
+  documento: { path: string; filename: string; mime: string; size: number; name?: string }
+): Promise<any[]> {
+  const copiado = await copiarNoStorage(documento.path, `licitacoes/${licitacaoCodigo}`, documento.filename, documento.mime, documento.size)
+  const { error } = await supabase.from('attachments').insert({
+    licitacaoCodigo,
+    name: documento.name || documento.filename,
+    filename: copiado.filename,
+    path: copiado.path,
+    mime: copiado.mime,
+    size: copiado.size,
+  })
+  if (error) {
+    await removerDoStorage([copiado.path]).catch(() => { /* o erro do insert é o que importa */ })
     throw error
   }
   return listAttachments(licitacaoCodigo)

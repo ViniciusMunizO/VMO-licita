@@ -5,8 +5,9 @@ import { listItems } from '../../utils/items'
 import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed } from '../../utils/format'
-import { agruparPorLote, somaColuna } from '../../utils/itens'
+import { agruparPorLote, somaColuna, parseMotivo } from '../../utils/itens'
 import { exportElementsToPdf } from '../../utils/pdf'
+import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
 
@@ -84,6 +85,39 @@ export default function RelatorioItensDesclassificados() {
 
   const todosItensDesclassificados = desclassificados.flatMap(g => g.itensDesclassificados)
 
+  // Resumo por categoria de motivo — sem padronizar o campo isso contava
+  // "Documentação" e "documentação" como coisas diferentes.
+  const resumoPorMotivo = React.useMemo(() => {
+    const contagem = new Map<string, number>()
+    for (const it of todosItensDesclassificados) {
+      const { categoria } = parseMotivo(it.motivoDesclassificacao || '')
+      const chave = categoria || 'Sem motivo'
+      contagem.set(chave, (contagem.get(chave) || 0) + 1)
+    }
+    return Array.from(contagem.entries()).sort((a, b) => b[1] - a[1])
+  }, [todosItensDesclassificados])
+
+  const exportarExcel = () => {
+    const linhas = desclassificados.flatMap(({ licitacao: l, itensDesclassificados }) =>
+      itensDesclassificados.map((it: any) => ({
+        Licitação: l.codigo,
+        Data: formatDateTimeBR(l.dataLicitacao, l.horaLicitacao).split(' ')[0],
+        Órgão: contratanteNome(l),
+        UF: contratanteUf(l),
+        Pregão: l.numeroPregao || '',
+        Lote: it.lote || '',
+        Item: it.item ?? '',
+        Descrição: it.descricao || '',
+        Marca: it.marca || '',
+        Quantidade: Number(it.quantidade) || 0,
+        Custo: Number(it.totalCusto) || 0,
+        Motivo: it.motivoDesclassificacao || '',
+        Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
+      }))
+    )
+    exportRowsToExcel(linhas, 'relatorio_itens_desclassificados.xlsx', 'Desclassificados')
+  }
+
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
@@ -99,13 +133,41 @@ export default function RelatorioItensDesclassificados() {
             <button type="button" onClick={() => setBusca('')} className="btn btn-ghost text-sm">Limpar</button>
           )}
         </div>
-        <button
-          onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_desclassificados.pdf', 'Relatório - Licitações/Itens Desclassificadas', 'landscape')}
-          className="btn btn-primary"
-        >
-          Exportar (PDF)
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportarExcel} className="btn btn-ghost">Exportar (Excel)</button>
+          <button
+            onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_itens_desclassificados.pdf', 'Relatório - Licitações/Itens Desclassificadas', 'landscape')}
+            className="btn btn-primary"
+          >
+            Exportar (PDF)
+          </button>
+        </div>
       </div>
+
+      {resumoPorMotivo.length > 0 && (
+        <div className="bg-white p-4 rounded shadow mb-4">
+          <h4 className="font-semibold mb-3 text-sm">Motivos mais comuns</h4>
+          <div className="space-y-2">
+            {resumoPorMotivo.map(([motivo, count]) => {
+              const max = resumoPorMotivo[0][1]
+              return (
+                <div key={motivo}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-700">{motivo}</span>
+                    <span className="text-gray-500">{count}</span>
+                  </div>
+                  <div className="h-2 rounded bg-gray-100 overflow-hidden">
+                    <div
+                      className="h-full rounded"
+                      style={{ width: `${(count / max) * 100}%`, backgroundColor: 'var(--color-accent)' }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
         <span className="text-sm text-gray-600">Kralen:</span>

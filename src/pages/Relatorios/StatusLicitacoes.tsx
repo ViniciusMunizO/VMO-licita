@@ -5,6 +5,7 @@ import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatFixed } from '../../utils/format'
 import { exportElementsToPdf } from '../../utils/pdf'
+import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
 import StatusBadge from '../../components/StatusBadge'
@@ -57,6 +58,20 @@ export default function RelatorioStatusLicitacoes() {
     })
     .filter(l => passaFiltroKralen(l.lancadoNoKralen, filtroKralen))
 
+  const exportarExcel = () => {
+    const linhas = listaFiltrada.map(l => ({
+      Licitação: l.codigo,
+      Ano: l.ano || '',
+      Data: formatDateTimeBR(l.dataLicitacao, l.horaLicitacao).split(' ')[0],
+      Órgão: contratanteNome(l),
+      UF: contratanteUf(l),
+      Pregão: l.numeroPregao || '',
+      Status: l.status || 'Sem status',
+      Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
+    }))
+    exportRowsToExcel(linhas, 'relatorio_status_licitacoes.xlsx', 'Status')
+  }
+
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
@@ -75,12 +90,15 @@ export default function RelatorioStatusLicitacoes() {
             ))}
           </div>
         </div>
-        <button
-          onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_status_licitacoes.pdf', 'Relatório de Status das Licitações', 'landscape')}
-          className="btn btn-primary"
-        >
-          Exportar (PDF)
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportarExcel} className="btn btn-ghost">Exportar (Excel)</button>
+          <button
+            onClick={() => containerRef.current && exportElementsToPdf([containerRef.current], 'relatorio_status_licitacoes.pdf', 'Relatório de Status das Licitações', 'landscape')}
+            className="btn btn-primary"
+          >
+            Exportar (PDF)
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">

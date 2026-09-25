@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { listAttachments, addAttachment, removeAttachment, getAttachmentData } from '../utils/attachments'
+import { listAttachments, addAttachment, addAttachmentFromDocumento, removeAttachment, getAttachmentData } from '../utils/attachments'
+import { listDocumentosEmpresa, DocumentoEmpresa } from '../utils/documentos'
 import { auditLog } from '../utils/audit'
 import { urlsAssinadas, urlAssinada, baixarAnexo, formatarTamanho, MAX_ANEXO_BYTES } from '../utils/arquivo'
 
@@ -21,6 +22,7 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
   // Caminho no bucket -> URL assinada. O bucket é privado, então não existe
   // link fixo: as URLs são geradas de uma vez pra lista toda ao carregar.
   const [urls, setUrls] = useState<Record<string, string>>({})
+  const [documentosEmpresa, setDocumentosEmpresa] = useState<DocumentoEmpresa[]>([])
 
   const carregarUrls = async (anexos: Attachment[]) => {
     const paths = anexos.map(a => a.path).filter(Boolean) as string[]
@@ -46,6 +48,9 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
       // Sem isso, falha de leitura mostrava "Nenhum anexo" — a mesma tela de
       // quando realmente não há anexo, o que é bem pior do que um erro.
       .catch(() => { if (mounted) setErro('Não consegui carregar os anexos desta licitação.') })
+    listDocumentosEmpresa()
+      .then(list => { if (mounted) setDocumentosEmpresa(list.filter(d => d.reutilizavel && d.path)) })
+      .catch(() => { /* atalho opcional — falha aqui não impede anexar por upload normal */ })
     return () => { mounted = false }
   }, [open, codigo])
 
@@ -62,6 +67,29 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
       void recordUpload({ name: att.name, filename: f.name })
     } catch (err: any) {
       setErro(err?.message || 'Não consegui salvar o anexo. Tente novamente.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const anexarDaEmpresa = async (documentoId: string) => {
+    const doc = documentosEmpresa.find(d => d.id === documentoId)
+    if (!doc || !doc.path) return
+    setErro('')
+    setSalvando(true)
+    try {
+      const updated = await addAttachmentFromDocumento(codigo, {
+        path: doc.path,
+        filename: doc.filename || doc.tipo,
+        mime: doc.mime || 'application/octet-stream',
+        size: doc.size || 0,
+        name: doc.tipo,
+      })
+      setList(updated)
+      await carregarUrls(updated)
+      void recordUpload({ name: doc.tipo, filename: doc.filename || doc.tipo })
+    } catch (err: any) {
+      setErro(err?.message || 'Não consegui anexar o documento da empresa.')
     } finally {
       setSalvando(false)
     }
@@ -155,6 +183,21 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
             </label>
           </div>
           <p className="text-xs text-gray-500 mt-1">Tamanho máximo por anexo: {formatarTamanho(MAX_ANEXO_BYTES)}.</p>
+
+          {documentosEmpresa.length > 0 && (
+            <select
+              disabled={salvando}
+              value=""
+              onChange={e => { if (e.target.value) void anexarDaEmpresa(e.target.value) }}
+              className="w-full p-2 rounded text-sm mt-2"
+            >
+              <option value="">Anexar da empresa...</option>
+              {documentosEmpresa.map(d => (
+                <option key={d.id} value={d.id}>{d.tipo}{d.numero ? ` — ${d.numero}` : ''}</option>
+              ))}
+            </select>
+          )}
+
           {erro && <p className="text-sm mt-2" style={{ color: 'var(--color-error)' }}>{erro}</p>}
         </div>
 

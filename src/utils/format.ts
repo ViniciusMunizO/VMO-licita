@@ -58,3 +58,13 @@ export function formatFixed(value: any, decimals = 2): string {
   if (isNaN(num)) return String(value)
   return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num)
 }
+
+export function formatMoneyBRL(value: number): string {
+  return `R$ ${formatFixed(value)}`
+}
+
+// % de margem sobre o custo (ex.: Vlr Ganho 24.697,53 / Custo 20.280,00 → 21,78%).
+export function margemPercentual(valorGanho: number, custo: number): number | null {
+  if (!custo) return null
+  return (valorGanho / custo - 1) * 100
+}

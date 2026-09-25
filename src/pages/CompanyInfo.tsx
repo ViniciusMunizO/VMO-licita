@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { getEmpresaInfo, saveEmpresaInfo } from '../utils/empresa'
 import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
+import DocumentosEmpresaSection from '../components/DocumentosEmpresaSection'
 
 type BancoConta = {
   id: string
@@ -248,6 +249,8 @@ export default function CompanyInfo() {
           {savedAt && <span className="text-sm text-green-600">Informações salvas.</span>}
         </div>
       </form>
+
+      <DocumentosEmpresaSection />
     </div>
   )
 }

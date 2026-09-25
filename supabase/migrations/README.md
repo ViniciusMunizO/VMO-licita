@@ -39,6 +39,7 @@ defasagem silenciosa.
 | `0001_attachments_e_updated_at.sql` | Aplica as colunas pendentes de `attachments` e faz `updated_at` se atualizar sozinho em `items` e `licitacoes`. |
 | `0002_remover_planilha_fortune_sheet.sql` | **Apaga dados.** Derruba `planilhas` e `planilha_modelos`, da planilha livre estilo Excel que foi descartada. Opcional — rode quando tiver certeza. |
 | `0003_remover_cotacao.sql` | Desfaz a grade de cotação dentro do cadastro, também descartada: derruba `cotacao_colunas`, `cotacao_modelos`, a RPC `salvar_licitacao_com_itens` e as colunas que só ela usava em `items`. Só tem efeito em quem rodou a versão antiga do `0001_cotacao.sql`. |
+| `0004_documentos_empresa.sql` | Cria `documentos_empresa` (certidões/documentos da empresa com data de validade), com RLS e `updated_at` automático. |
 
 ## Nota sobre o `0001_cotacao.sql`
 
