@@ -132,22 +132,22 @@ export default function FormLicitacao() {
       <form onSubmit={save} className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-gray-600">Código</label>
-            <input value={modelo.codigo} readOnly className="w-full p-2 bg-gray-100 rounded readonly-field" />
+            <label htmlFor="f-codigo" className="block text-sm text-gray-600">Código</label>
+            <input id="f-codigo" value={modelo.codigo} readOnly className="w-full p-2 bg-gray-100 rounded readonly-field" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Ano</label>
-            <input type="number" value={modelo.ano} onChange={e => setModelo({ ...modelo, ano: Number(e.target.value) })} className="w-full p-2 rounded" />
+            <label htmlFor="f-ano" className="block text-sm text-gray-600">Ano</label>
+            <input id="f-ano" type="number" value={modelo.ano} onChange={e => setModelo({ ...modelo, ano: Number(e.target.value) })} className="w-full p-2 rounded" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Criado por</label>
-            <input value={user?.name || ''} readOnly className="w-full p-2 bg-gray-100 rounded readonly-field" />
+            <label htmlFor="f-criadopor" className="block text-sm text-gray-600">Criado por</label>
+            <input id="f-criadopor" value={user?.name || ''} readOnly className="w-full p-2 bg-gray-100 rounded readonly-field" />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm text-gray-600">Status</label>
-          <select value={(modelo as any).status || ''} onChange={e => setModelo({ ...modelo, status: e.target.value })} className="w-full p-2 rounded">
+          <label htmlFor="f-status" className="block text-sm text-gray-600">Status</label>
+          <select id="f-status" value={(modelo as any).status || ''} onChange={e => setModelo({ ...modelo, status: e.target.value })} className="w-full p-2 rounded">
             <option value="">(sem status)</option>
             <option value="Ganhou">Ganhou</option>
             <option value="Perdeu">Perdeu</option>
@@ -155,14 +155,14 @@ export default function FormLicitacao() {
         </div>
 
         <div>
-          <label className="block text-sm text-gray-600">Contratante</label>
+          <label htmlFor="f-contratante" className="block text-sm text-gray-600">Contratante</label>
           {/* Input e botão lado a lado, não sobrepostos. O botão ficava
               posicionado por cima do campo, e o nome do município digitado
               passava por baixo dele — no celular sobrava menos da metade do
               campo visível. Abaixo de 640px ele desce pra linha de baixo. */}
           <div className="relative">
             <div className="flex flex-col sm:flex-row gap-2">
-              <input placeholder="Município" value={selectedContratante ? `${selectedContratante.nome} / ${selectedContratante.uf}` : (modelo.contratado || '')} onChange={e => {
+              <input id="f-contratante" placeholder="Município" value={selectedContratante ? `${selectedContratante.nome} / ${selectedContratante.uf}` : (modelo.contratado || '')} onChange={e => {
                 setModelo({ ...modelo, contratado: e.target.value })
                 setSelectedContratante(null)
               }} className="w-full p-2 rounded" onFocus={() => setContratanteFocused(true)} onBlur={() => setContratanteFocused(false)} />
@@ -195,23 +195,23 @@ export default function FormLicitacao() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-600">Número do Pregão</label>
-            <input value={(modelo as any).numeroPregao || ''} onChange={e => setModelo({ ...modelo, numeroPregao: e.target.value })} className="w-full p-2 rounded" />
+            <label htmlFor="f-numeroPregao" className="block text-sm text-gray-600">Número do Pregão</label>
+            <input id="f-numeroPregao" value={(modelo as any).numeroPregao || ''} onChange={e => setModelo({ ...modelo, numeroPregao: e.target.value })} className="w-full p-2 rounded" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Número do Processo</label>
-            <input value={(modelo as any).numeroProcesso || ''} onChange={e => setModelo({ ...modelo, numeroProcesso: e.target.value })} className="w-full p-2 rounded" />
+            <label htmlFor="f-numeroProcesso" className="block text-sm text-gray-600">Número do Processo</label>
+            <input id="f-numeroProcesso" value={(modelo as any).numeroProcesso || ''} onChange={e => setModelo({ ...modelo, numeroProcesso: e.target.value })} className="w-full p-2 rounded" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-600">Portal Eletrônico</label>
-            <input value={(modelo as any).portal || ''} onChange={e => setModelo({ ...modelo, portal: e.target.value })} className="w-full p-2 rounded" />
+            <label htmlFor="f-portal" className="block text-sm text-gray-600">Portal Eletrônico</label>
+            <input id="f-portal" value={(modelo as any).portal || ''} onChange={e => setModelo({ ...modelo, portal: e.target.value })} className="w-full p-2 rounded" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Tipo Objeto</label>
-            <select value={(modelo as any).tipoObjeto || ''} onChange={e => setModelo({ ...modelo, tipoObjeto: e.target.value })} className="w-full p-2 rounded">
+            <label htmlFor="f-tipoObjeto" className="block text-sm text-gray-600">Tipo Objeto</label>
+            <select id="f-tipoObjeto" value={(modelo as any).tipoObjeto || ''} onChange={e => setModelo({ ...modelo, tipoObjeto: e.target.value })} className="w-full p-2 rounded">
               <option value="">— selecione —</option>
               <option>Medicamentos</option>
               <option>Materiais</option>
@@ -221,36 +221,36 @@ export default function FormLicitacao() {
         </div>
 
         <div>
-          <label className="block text-sm text-gray-600">Objeto Licitação</label>
-          <textarea value={(modelo as any).objetoLicitacao || ''} onChange={e => setModelo({ ...modelo, objetoLicitacao: e.target.value })} className="w-full p-2 rounded" rows={3} />
+          <label htmlFor="f-objetoLicitacao" className="block text-sm text-gray-600">Objeto Licitação</label>
+          <textarea id="f-objetoLicitacao" value={(modelo as any).objetoLicitacao || ''} onChange={e => setModelo({ ...modelo, objetoLicitacao: e.target.value })} className="w-full p-2 rounded" rows={3} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-600">Data de Credenciamento</label>
-            <DateInputBR value={(modelo as any).dataCredenciamento || ''} readOnly className="w-full p-2 rounded readonly-field" />
+            <label htmlFor="f-dataCredenciamento" className="block text-sm text-gray-600">Data de Credenciamento</label>
+            <DateInputBR id="f-dataCredenciamento" value={(modelo as any).dataCredenciamento || ''} readOnly className="w-full p-2 rounded readonly-field" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Horário de Credenciamento</label>
-            <TimeInputBR value={(modelo as any).horaCredenciamento || ''} readOnly className="w-full p-2 rounded readonly-field" />
+            <label htmlFor="f-horaCredenciamento" className="block text-sm text-gray-600">Horário de Credenciamento</label>
+            <TimeInputBR id="f-horaCredenciamento" value={(modelo as any).horaCredenciamento || ''} readOnly className="w-full p-2 rounded readonly-field" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-600">Data da Licitação</label>
-            <DateInputBR value={(modelo as any).dataLicitacao || ''} onChange={v => setModelo({ ...modelo, dataLicitacao: v })} className="w-full p-2 rounded" />
+            <label htmlFor="f-dataLicitacao" className="block text-sm text-gray-600">Data da Licitação</label>
+            <DateInputBR id="f-dataLicitacao" value={(modelo as any).dataLicitacao || ''} onChange={v => setModelo({ ...modelo, dataLicitacao: v })} className="w-full p-2 rounded" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Horário da Licitação</label>
-            <TimeInputBR value={(modelo as any).horaLicitacao || ''} onChange={v => setModelo({ ...modelo, horaLicitacao: v })} className="w-full p-2 rounded" />
+            <label htmlFor="f-horaLicitacao" className="block text-sm text-gray-600">Horário da Licitação</label>
+            <TimeInputBR id="f-horaLicitacao" value={(modelo as any).horaLicitacao || ''} onChange={v => setModelo({ ...modelo, horaLicitacao: v })} className="w-full p-2 rounded" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-600">Tipo de disputa</label>
-            <select value={(modelo as any).tipoDisputa || ''} onChange={e => setModelo({ ...modelo, tipoDisputa: e.target.value })} className="w-full p-2 rounded">
+            <label htmlFor="f-tipoDisputa" className="block text-sm text-gray-600">Tipo de disputa</label>
+            <select id="f-tipoDisputa" value={(modelo as any).tipoDisputa || ''} onChange={e => setModelo({ ...modelo, tipoDisputa: e.target.value })} className="w-full p-2 rounded">
               <option value="">— selecione —</option>
               <option>Aberto</option>
               <option>Fechado</option>
@@ -259,8 +259,8 @@ export default function FormLicitacao() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Definição de Julgamento</label>
-            <select value={(modelo as any).definJulgamento || ''} onChange={e => setModelo({ ...modelo, definJulgamento: e.target.value })} className="w-full p-2 rounded">
+            <label htmlFor="f-definJulgamento" className="block text-sm text-gray-600">Definição de Julgamento</label>
+            <select id="f-definJulgamento" value={(modelo as any).definJulgamento || ''} onChange={e => setModelo({ ...modelo, definJulgamento: e.target.value })} className="w-full p-2 rounded">
               <option value="">— selecione —</option>
               <option>Item</option>
               <option>Lote</option>
@@ -273,12 +273,12 @@ export default function FormLicitacao() {
           <p className="text-sm text-gray-500 mb-3">Deixe em branco quando não se aplicar. Preenchidos, aparecem no alerta de prazos do Dashboard.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-600">Data-limite pra Recurso</label>
-              <DateInputBR value={(modelo as any).dataLimiteRecurso || ''} onChange={v => setModelo({ ...modelo, dataLimiteRecurso: v })} className="w-full p-2 rounded" />
+              <label htmlFor="f-dataLimiteRecurso" className="block text-sm text-gray-600">Data-limite pra Recurso</label>
+              <DateInputBR id="f-dataLimiteRecurso" value={(modelo as any).dataLimiteRecurso || ''} onChange={v => setModelo({ ...modelo, dataLimiteRecurso: v })} className="w-full p-2 rounded" />
             </div>
             <div>
-              <label className="block text-sm text-gray-600">Data-limite pra Impugnação</label>
-              <DateInputBR value={(modelo as any).dataLimiteImpugnacao || ''} onChange={v => setModelo({ ...modelo, dataLimiteImpugnacao: v })} className="w-full p-2 rounded" />
+              <label htmlFor="f-dataLimiteImpugnacao" className="block text-sm text-gray-600">Data-limite pra Impugnação</label>
+              <DateInputBR id="f-dataLimiteImpugnacao" value={(modelo as any).dataLimiteImpugnacao || ''} onChange={v => setModelo({ ...modelo, dataLimiteImpugnacao: v })} className="w-full p-2 rounded" />
             </div>
           </div>
         </div>
@@ -287,28 +287,28 @@ export default function FormLicitacao() {
           <h4 className="font-semibold mb-3">Proposta</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-600">Validade da Proposta</label>
-              <input value={(modelo as any).prazoValidade || ''} onChange={e => setModelo({ ...modelo, prazoValidade: e.target.value })} className="w-full p-2 rounded" />
+              <label htmlFor="f-prazoValidade" className="block text-sm text-gray-600">Validade da Proposta</label>
+              <input id="f-prazoValidade" value={(modelo as any).prazoValidade || ''} onChange={e => setModelo({ ...modelo, prazoValidade: e.target.value })} className="w-full p-2 rounded" />
             </div>
             <div>
-              <label className="block text-sm text-gray-600">Prazo de Entrega</label>
-              <input value={(modelo as any).prazoEntrega || ''} onChange={e => setModelo({ ...modelo, prazoEntrega: e.target.value })} className="w-full p-2 rounded" />
+              <label htmlFor="f-prazoEntrega" className="block text-sm text-gray-600">Prazo de Entrega</label>
+              <input id="f-prazoEntrega" value={(modelo as any).prazoEntrega || ''} onChange={e => setModelo({ ...modelo, prazoEntrega: e.target.value })} className="w-full p-2 rounded" />
             </div>
             <div>
-              <label className="block text-sm text-gray-600">Local de Entrega</label>
-              <input value={(modelo as any).localEntrega || ''} onChange={e => setModelo({ ...modelo, localEntrega: e.target.value })} className="w-full p-2 rounded" />
+              <label htmlFor="f-localEntrega" className="block text-sm text-gray-600">Local de Entrega</label>
+              <input id="f-localEntrega" value={(modelo as any).localEntrega || ''} onChange={e => setModelo({ ...modelo, localEntrega: e.target.value })} className="w-full p-2 rounded" />
             </div>
             <div>
-              <label className="block text-sm text-gray-600">Prazo de Pagamento</label>
-              <input value={(modelo as any).prazoPagamento || ''} onChange={e => setModelo({ ...modelo, prazoPagamento: e.target.value })} className="w-full p-2 rounded" />
+              <label htmlFor="f-prazoPagamento" className="block text-sm text-gray-600">Prazo de Pagamento</label>
+              <input id="f-prazoPagamento" value={(modelo as any).prazoPagamento || ''} onChange={e => setModelo({ ...modelo, prazoPagamento: e.target.value })} className="w-full p-2 rounded" />
             </div>
             <div>
-              <label className="block text-sm text-gray-600">Prazo de Garantia</label>
-              <input value={(modelo as any).prazoGarantia || 'Conforme Edital'} onChange={e => setModelo({ ...modelo, prazoGarantia: e.target.value })} className="w-full p-2 rounded" />
+              <label htmlFor="f-prazoGarantia" className="block text-sm text-gray-600">Prazo de Garantia</label>
+              <input id="f-prazoGarantia" value={(modelo as any).prazoGarantia || 'Conforme Edital'} onChange={e => setModelo({ ...modelo, prazoGarantia: e.target.value })} className="w-full p-2 rounded" />
             </div>
             <div>
-              <label className="block text-sm text-gray-600">Vigência do Contrato</label>
-              <input value={(modelo as any).vigenciaContrato || '12 (doze) meses'} onChange={e => setModelo({ ...modelo, vigenciaContrato: e.target.value })} className="w-full p-2 rounded" />
+              <label htmlFor="f-vigenciaContrato" className="block text-sm text-gray-600">Vigência do Contrato</label>
+              <input id="f-vigenciaContrato" value={(modelo as any).vigenciaContrato || '12 (doze) meses'} onChange={e => setModelo({ ...modelo, vigenciaContrato: e.target.value })} className="w-full p-2 rounded" />
             </div>
           </div>
         </div>
@@ -332,13 +332,13 @@ export default function FormLicitacao() {
           </div>
 
           <div className="mt-3">
-            <label className="block text-sm text-gray-600">Observação interna</label>
-            <textarea value={habilitacao.observacaoInterna} onChange={e => setHabilitacao({ ...habilitacao, observacaoInterna: e.target.value })} className="w-full p-2 rounded" />
+            <label htmlFor="f-observacaoInterna" className="block text-sm text-gray-600">Observação interna</label>
+            <textarea id="f-observacaoInterna" value={habilitacao.observacaoInterna} onChange={e => setHabilitacao({ ...habilitacao, observacaoInterna: e.target.value })} className="w-full p-2 rounded" />
           </div>
         </div>
 
         {erroSalvar && (
-          <div className="p-3 rounded text-sm" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>
+          <div role="alert" className="p-3 rounded text-sm" style={{ backgroundColor: 'var(--color-error-text)', color: '#fff' }}>
             {erroSalvar}
           </div>
         )}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { listLicitacoes } from '../../utils/licitacoes'
-import { listItems } from '../../utils/items'
+import { listItemsByCodigos } from '../../utils/items'
 import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatMoneyBRL, formatFixed } from '../../utils/format'
@@ -36,6 +36,7 @@ export default function RelatorioRankingContratantes() {
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
   const [ordem, setOrdem] = useState<OrdemCampo>('total')
+  const [erro, setErro] = useState('')
   const hoje = nowInBrasilia().date
 
   useEffect(() => {
@@ -44,15 +45,17 @@ export default function RelatorioRankingContratantes() {
       const list = await listLicitacoes()
       if (!mounted) return
       setLicitacoes(list)
-      const entries = await Promise.all(list.map(async (l: any) => {
-        const items = await listItems(l.codigo)
-        return [String(l.codigo), items] as const
-      }))
+      // Uma chamada só com `.in()`, em vez de uma por licitação (N+1).
+      const porCodigo = await listItemsByCodigos(list.map((l: any) => l.codigo))
       if (!mounted) return
-      setItemsByCodigo(Object.fromEntries(entries))
+      setItemsByCodigo(porCodigo)
       setLoading(false)
     }
-    load()
+    load().catch(err => {
+      if (!mounted) return
+      setErro(err?.message || 'Não foi possível carregar o ranking de contratantes.')
+      setLoading(false)
+    })
     return () => { mounted = false }
   }, [])
 
@@ -151,33 +154,34 @@ export default function RelatorioRankingContratantes() {
             {periodo === 'custom' && (dataInicioCustom || dataFimCustom) ? ` (${dataInicioCustom ? formatDateTimeBR(dataInicioCustom) : '…'} até ${dataFimCustom ? formatDateTimeBR(dataFimCustom) : 'hoje'})` : ''}
           </div>
 
+          {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
           {loading ? (
             <div className="text-sm text-gray-500">Carregando...</div>
-          ) : linhas.length === 0 ? (
+          ) : erro ? null : linhas.length === 0 ? (
             <div className="text-sm text-gray-500">Nenhuma licitação no período selecionado.</div>
           ) : (
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="text-left text-gray-500 border-b">
-                  <th className="p-1.5">Órgão:</th>
-                  <th className="p-1.5">UF:</th>
-                  <th className="p-1.5 text-right">Total:</th>
-                  <th className="p-1.5 text-right">Ganhou:</th>
-                  <th className="p-1.5 text-right">Perdeu:</th>
-                  <th className="p-1.5 text-right">Taxa:</th>
-                  <th className="p-1.5 text-right">Valor Ganho:</th>
+                  <th className="p-1.5 sticky top-0 bg-white">Órgão:</th>
+                  <th className="p-1.5 sticky top-0 bg-white">UF:</th>
+                  <th className="p-1.5 text-right sticky top-0 bg-white">Total:</th>
+                  <th className="p-1.5 text-right sticky top-0 bg-white">Ganhou:</th>
+                  <th className="p-1.5 text-right sticky top-0 bg-white">Perdeu:</th>
+                  <th className="p-1.5 text-right sticky top-0 bg-white">Taxa:</th>
+                  <th className="p-1.5 text-right sticky top-0 bg-white">Valor Ganho:</th>
                 </tr>
               </thead>
               <tbody>
                 {linhas.map(l => (
-                  <tr key={`${l.orgao}-${l.uf}`} className="border-t">
+                  <tr key={`${l.orgao}-${l.uf}`} className="border-t odd:bg-gray-50 hover:bg-gray-100">
                     <td className="p-1.5">{l.orgao}</td>
                     <td className="p-1.5">{l.uf || '-'}</td>
                     <td className="p-1.5 text-right">{l.total}</td>
                     <td className="p-1.5 text-right">{l.ganhou}</td>
                     <td className="p-1.5 text-right">{l.perdeu}</td>
                     <td className="p-1.5 text-right">{l.taxa === null ? '-' : `${formatFixed(l.taxa, 0)}%`}</td>
-                    <td className="p-1.5 text-right">{formatMoneyBRL(l.valorGanho)}</td>
+                    <td className="p-1.5 text-right font-semibold" style={{ color: 'var(--color-accent)' }}>{formatMoneyBRL(l.valorGanho)}</td>
                   </tr>
                 ))}
                 <tr className="border-t bg-gray-50 font-semibold">

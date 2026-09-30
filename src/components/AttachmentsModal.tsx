@@ -4,6 +4,7 @@ import { listDocumentosEmpresa, DocumentoEmpresa } from '../utils/documentos'
 import { auditLog } from '../utils/audit'
 import { confirmarRemocao } from '../utils/confirmar'
 import { urlsAssinadas, urlAssinada, baixarAnexo, formatarTamanho, MAX_ANEXO_BYTES } from '../utils/arquivo'
+import { useModalA11y } from './useModalA11y'
 
 type Attachment = {
   id: string
@@ -157,10 +158,12 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
     }
   }
 
+  const modalRef = useModalA11y(open, onClose)
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
+    <div ref={modalRef} className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
       <div className="bg-white rounded shadow max-w-2xl w-full p-4">
         <div className="flex justify-between items-center mb-4">
           <h4 className="font-semibold">Anexos — Licitação {codigo}</h4>
@@ -200,7 +203,7 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
             </select>
           )}
 
-          {erro && <p className="text-sm mt-2" style={{ color: 'var(--color-error)' }}>{erro}</p>}
+          {erro && <p role="alert" className="text-sm mt-2" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
         </div>
 
         <div className="max-h-64 overflow-auto rounded p-2">
@@ -219,7 +222,7 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
                 <div className="flex gap-2">
                   <button onClick={() => abrir(a)} className="btn btn-ghost">Abrir</button>
                   <button onClick={() => baixar(a)} className="btn btn-primary">Baixar</button>
-                  <button onClick={() => remove(a.id)} className="btn" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>Remover</button>
+                  <button onClick={() => remove(a.id)} className="btn" style={{ backgroundColor: 'var(--color-error-text)', color: '#fff' }}>Remover</button>
                 </div>
               </div>
             )

@@ -4,6 +4,7 @@ import { getEmpresaInfo } from '../utils/empresa'
 import { exportElementsToPdf } from '../utils/pdf'
 import { DECLARACOES, buildDeclaracaoContext, renderDeclaracaoText, DeclaracaoContext } from '../utils/declaracoes'
 import PrintableDeclaracao from './PrintableDeclaracao'
+import { useModalA11y } from './useModalA11y'
 
 function slugify(s: string) {
   return s
@@ -37,6 +38,7 @@ export default function DeclaracoesSection({ modelo }: { modelo: any }) {
   const [customTitulo, setCustomTitulo] = useState('')
   const [customCorpo, setCustomCorpo] = useState('')
   const pageRef = useRef<HTMLDivElement | null>(null)
+  const modalRef = useModalA11y(showCustom, () => setShowCustom(false))
 
   useEffect(() => {
     let mounted = true
@@ -108,7 +110,7 @@ export default function DeclaracoesSection({ modelo }: { modelo: any }) {
       </div>
 
       {showCustom && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
+        <div ref={modalRef} className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
           <div className="bg-white rounded shadow max-w-2xl w-full p-4">
             <div className="flex justify-between items-center mb-4">
               <h4 className="font-semibold">Declaração Personalizada</h4>
@@ -116,12 +118,12 @@ export default function DeclaracoesSection({ modelo }: { modelo: any }) {
             </div>
             <form onSubmit={gerarPersonalizada} className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-600">Título</label>
-                <input value={customTitulo} onChange={e => setCustomTitulo(e.target.value)} className="w-full p-2 rounded" required />
+                <label htmlFor="decl-titulo" className="block text-sm text-gray-600">Título</label>
+                <input id="decl-titulo" value={customTitulo} onChange={e => setCustomTitulo(e.target.value)} className="w-full p-2 rounded" required />
               </div>
               <div>
-                <label className="block text-sm text-gray-600">Texto</label>
-                <textarea value={customCorpo} onChange={e => setCustomCorpo(e.target.value)} className="w-full p-2 rounded" rows={8} />
+                <label htmlFor="decl-corpo" className="block text-sm text-gray-600">Texto</label>
+                <textarea id="decl-corpo" value={customCorpo} onChange={e => setCustomCorpo(e.target.value)} className="w-full p-2 rounded" rows={8} />
               </div>
               <button className="btn btn-primary" type="submit">Gerar PDF</button>
             </form>

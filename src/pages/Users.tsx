@@ -10,10 +10,19 @@ const ROLE_LABELS: Record<Profile['role'], string> = {
 export default function Users() {
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState('')
 
   useEffect(() => {
     let mounted = true
-    listProfiles().then(u => { if (mounted) { setUsers(u); setLoading(false) } })
+    listProfiles().then(u => {
+      if (!mounted) return
+      setUsers(u)
+      setLoading(false)
+    }).catch(err => {
+      if (!mounted) return
+      setErro(err?.message || 'Não foi possível carregar a lista de usuários.')
+      setLoading(false)
+    })
     return () => { mounted = false }
   }, [])
 
@@ -25,10 +34,11 @@ export default function Users() {
         Criação de novo usuário é feita direto no painel do Supabase (Authentication → Add user). Depois de criado, o papel dele (Administrador/Moderador/Usuário) pode ser ajustado na tabela <code>profiles</code> — e ele só enxerga o sistema depois que alguém marcar <code>ativo = true</code> na linha dele nessa mesma tabela.
       </div>
 
+      {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
       <div className="bg-white p-4 rounded shadow">
         {loading ? (
           <div className="text-sm text-gray-500">Carregando...</div>
-        ) : (
+        ) : erro ? null : (
           <table className="w-full">
             <thead>
               <tr className="text-left text-sm text-gray-500">

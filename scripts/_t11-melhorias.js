@@ -73,6 +73,21 @@ async function main() {
   t = await H.texto(page)
   H.check('"Voltar pro login" volta pro formulário normal', t.includes('Use seu e-mail e senha'))
 
+  H.secao('47. Auditoria — paginação')
+  await H.login(page)
+  await page.goto(`${H.BASE}/admin/audit`, { waitUntil: 'networkidle0' })
+  await new Promise(r => setTimeout(r, 1200))
+  const linhasAntes = (await page.$$('.max-h-96 > div')).length
+  H.check('carrega até 200 logs de uma vez (não a trilha inteira)', linhasAntes <= 200, `linhas: ${linhasAntes}`)
+  const temBotao = await H.clicarPorTexto(page, 'Carregar mais')
+  if (temBotao) {
+    await new Promise(r => setTimeout(r, 1500))
+    const linhasDepois = (await page.$$('.max-h-96 > div')).length
+    H.check('"Carregar mais" traz mais logs', linhasDepois > linhasAntes, `${linhasAntes} → ${linhasDepois}`)
+  } else {
+    H.check('"Carregar mais" não aparece quando não há mais de 200 logs', true)
+  }
+
   const errosReais = erros.filter(e => !e.includes('status of 400'))
   H.check('nenhum erro inesperado de console/página', errosReais.length === 0, JSON.stringify(errosReais.slice(0, 5)))
 

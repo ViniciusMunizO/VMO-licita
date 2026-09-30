@@ -20,6 +20,11 @@ html, body, #root {
   /* Vermelho por significado (erro, perigo, desclassificação), não por marca —
      por isso não muda quando a identidade visual do sistema muda. */
   --color-error: #EF4136;
+  /* Mesmo vermelho, mais escuro: usado sempre que o vermelho carrega TEXTO
+     (rótulo, botão, badge com texto branco em cima) — #EF4136 puro fica abaixo
+     de 4.5:1 (AA) nesses casos. `--color-error` continua só pra borda/ícone
+     grande, onde 3:1 já basta. */
+  --color-error-text: #b91c1c;
 }
 
 /* Base typography and layout polish */

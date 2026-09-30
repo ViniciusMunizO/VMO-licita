@@ -12,7 +12,7 @@ const FORM_VAZIO = { tipo: '', numero: '', dataEmissao: '', dataValidade: '', re
 
 function corValidade(dias: number | null): string {
   if (dias === null) return '#6b7280'
-  if (dias < 0) return 'var(--color-error)'
+  if (dias < 0) return 'var(--color-error-text)'
   if (dias <= 30) return '#b45309'
   return '#15803d'
 }
@@ -157,7 +157,7 @@ export default function DocumentosEmpresaSection() {
       </form>
       <p className="text-xs text-gray-500 -mt-2 mb-3">Tamanho máximo por arquivo: {formatarTamanho(MAX_ANEXO_BYTES)}.</p>
 
-      {erro && <p className="text-sm mb-3" style={{ color: 'var(--color-error)' }}>{erro}</p>}
+      {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
 
       {docs.length === 0 ? (
         <p className="text-sm text-gray-500">Nenhum documento cadastrado ainda.</p>
@@ -182,7 +182,7 @@ export default function DocumentosEmpresaSection() {
                   </label>
                   <button onClick={() => abrir(d)} className="btn btn-ghost text-sm">Abrir</button>
                   <button onClick={() => baixar(d)} className="btn btn-ghost text-sm">Baixar</button>
-                  <button onClick={() => remover(d.id)} className="btn text-sm" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>Remover</button>
+                  <button onClick={() => remover(d.id)} className="btn text-sm" style={{ backgroundColor: 'var(--color-error-text)', color: '#fff' }}>Remover</button>
                 </div>
               </div>
             )

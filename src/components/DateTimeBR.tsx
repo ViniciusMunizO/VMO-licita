@@ -18,6 +18,11 @@ function brDateToIso(br: string): string {
   const d = digits.slice(0, 2)
   const m = digits.slice(2, 4)
   const y = digits.slice(4, 8)
+  // new Date() normaliza datas inexistentes (31/02 vira 03/03) em vez de
+  // rejeitar — sem essa conferência de volta, "31/02/2026" virava um ISO
+  // válido na forma mas uma data que nunca existiu, salva sem nenhum aviso.
+  const dt = new Date(Number(y), Number(m) - 1, Number(d))
+  if (dt.getFullYear() !== Number(y) || dt.getMonth() !== Number(m) - 1 || dt.getDate() !== Number(d)) return ''
   return `${y}-${m}-${d}`
 }
 
@@ -38,9 +43,10 @@ type BaseProps = {
   onChange?: (isoValue: string) => void
   readOnly?: boolean
   className?: string
+  id?: string
 }
 
-export function DateInputBR({ value, onChange, readOnly, className }: BaseProps) {
+export function DateInputBR({ value, onChange, readOnly, className, id }: BaseProps) {
   const [text, setText] = useState(() => isoDateToBR(value || ''))
 
   useEffect(() => {
@@ -48,12 +54,13 @@ export function DateInputBR({ value, onChange, readOnly, className }: BaseProps)
   }, [value])
 
   if (readOnly) {
-    return <input type="text" value={text} readOnly className={className} />
+    return <input type="text" id={id} value={text} readOnly className={className} />
   }
 
   return (
     <input
       type="text"
+      id={id}
       inputMode="numeric"
       placeholder="dd/mm/aaaa"
       value={text}
@@ -69,7 +76,7 @@ export function DateInputBR({ value, onChange, readOnly, className }: BaseProps)
   )
 }
 
-export function TimeInputBR({ value, onChange, readOnly, className }: BaseProps) {
+export function TimeInputBR({ value, onChange, readOnly, className, id }: BaseProps) {
   const [text, setText] = useState(value || '')
 
   useEffect(() => {
@@ -77,12 +84,13 @@ export function TimeInputBR({ value, onChange, readOnly, className }: BaseProps)
   }, [value])
 
   if (readOnly) {
-    return <input type="text" value={text} readOnly className={className} />
+    return <input type="text" id={id} value={text} readOnly className={className} />
   }
 
   return (
     <input
       type="text"
+      id={id}
       inputMode="numeric"
       placeholder="hh:mm"
       value={text}

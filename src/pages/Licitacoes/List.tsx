@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { listLicitacoes } from '../../utils/licitacoes'
-import { listItems } from '../../utils/items'
-import { listAtas } from '../../utils/atas'
+import { listItemsByCodigos } from '../../utils/items'
+import { listAtasByCodigos } from '../../utils/atas'
 import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import { DateInputBR } from '../../components/DateTimeBR'
@@ -13,38 +13,58 @@ const FILTROS_VAZIOS = { codigo: '', contratante: '', numeroPregao: '', numeroPr
 export default function ListLicitacoes() {
   const [list, setList] = useState<any[]>([])
   const [hasAtaByCodigo, setHasAtaByCodigo] = useState<Record<string, boolean>>({})
-  const [itemsTextByCodigo, setItemsTextByCodigo] = useState<Record<string, string>>({})
+  // `null` = ainda não buscado. A busca por texto de item só baixa dado do
+  // banco quando o usuário de fato digita algo em "Busca geral" — antes desta
+  // troca, a tela baixava os itens de TODAS as licitações no mount, mesmo que
+  // a busca nunca fosse usada (o pior caso do N+1 que existia aqui).
+  const [itemsTextByCodigo, setItemsTextByCodigo] = useState<Record<string, string> | null>(null)
   const [listOptions, setListOptions] = useState<any>({ page: 1, pageSize: 10, sortBy: 'codigo', sortDir: 'desc' })
   const [filters, setFilters] = useState<any>(FILTROS_VAZIOS)
   const [searchTerm, setSearchTerm] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('todos')
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState('')
   const hoje = nowInBrasilia().date
 
   useEffect(() => {
     let mounted = true
+    setErro('')
     listLicitacoes().then(async (raw) => {
       if (!mounted) return
       const items: any[] = raw || []
       setList(items)
-      const entries = await Promise.all(items.map(async (l) => {
-        const atas = await listAtas(l.codigo)
-        return [String(l.codigo), Array.isArray(atas) && atas.length > 0] as const
-      }))
+      setLoading(false)
+      // Uma chamada só com `.in()` pros atas de todas as licitações, em vez de
+      // uma chamada por licitação (N+1) — ver listAtasByCodigos.
+      const porCodigo = await listAtasByCodigos(items.map(l => l.codigo))
       if (!mounted) return
-      setHasAtaByCodigo(Object.fromEntries(entries))
-
-      const itemsEntries = await Promise.all(items.map(async (l) => {
-        const its = await listItems(l.codigo)
-        const text = Array.isArray(its) ? its.map((it: any) => JSON.stringify(it)).join(' ') : ''
-        return [String(l.codigo), text] as const
-      }))
+      const hasAta: Record<string, boolean> = {}
+      for (const l of items) hasAta[String(l.codigo)] = (porCodigo[String(l.codigo)] || []).length > 0
+      setHasAtaByCodigo(hasAta)
+    }).catch(err => {
       if (!mounted) return
-      setItemsTextByCodigo(Object.fromEntries(itemsEntries))
+      setErro(err?.message || 'Não foi possível carregar a lista de licitações.')
+      setLoading(false)
     })
     return () => { mounted = false }
   }, [])
+
+  useEffect(() => {
+    if (!filters.q || itemsTextByCodigo !== null || list.length === 0) return
+    let mounted = true
+    listItemsByCodigos(list.map(l => l.codigo)).then(porCodigo => {
+      if (!mounted) return
+      const text: Record<string, string> = {}
+      for (const l of list) {
+        const its = porCodigo[String(l.codigo)] || []
+        text[String(l.codigo)] = its.map((it: any) => JSON.stringify(it)).join(' ')
+      }
+      setItemsTextByCodigo(text)
+    }).catch(() => { /* busca por item falhou: filtro cai pra só o texto da licitação, resto da tela segue normal */ })
+    return () => { mounted = false }
+  }, [filters.q, itemsTextByCodigo, list])
 
   // debounce searchTerm -> filters.q
   useEffect(() => {
@@ -85,7 +105,7 @@ export default function ListLicitacoes() {
     }
     if (!dataDentroDoPeriodo(l.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom)) return false
     if (filters.q) {
-      const hay = (JSON.stringify(l) + ' ' + (itemsTextByCodigo[String(l.codigo)] || '')).toLowerCase()
+      const hay = (JSON.stringify(l) + ' ' + (itemsTextByCodigo?.[String(l.codigo)] || '')).toLowerCase()
       if (!hay.includes(String(filters.q).toLowerCase())) return false
     }
     return true
@@ -114,6 +134,8 @@ export default function ListLicitacoes() {
         <h3 className="text-xl sm:text-2xl font-semibold">Licitações</h3>
         <Link to="/licitacoes/novo" className="btn btn-primary">Nova Licitação</Link>
       </div>
+
+      {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
 
       <div className="bg-white p-4 rounded shadow mb-4">
         <h4 className="font-semibold mb-2">Filtros</h4>
@@ -193,21 +215,36 @@ export default function ListLicitacoes() {
 
       <div className="bg-white p-4 rounded shadow">
         <div className="mt-4">
+          {loading ? (
+            <div className="text-sm text-gray-500 p-4">Carregando...</div>
+          ) : paginated.length === 0 ? (
+            <div className="text-sm text-gray-500 p-6 text-center">
+              {list.length === 0 ? (
+                <p>Nenhuma licitação cadastrada ainda.</p>
+              ) : (
+                <>
+                  <p className="mb-2">Nenhuma licitação encontrada com esses filtros.</p>
+                  <button type="button" onClick={clearFilters} className="btn btn-ghost text-sm">Limpar filtros</button>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
           <div className="table-scroll">
           <table className="w-full table-auto min-w-[640px]">
             <thead>
               <tr className="text-left text-sm text-gray-500">
-                <th className="p-2">Código</th>
-                <th className="p-2">Ano</th>
-                <th className="p-2">Contratante</th>
-                <th className="p-2">Data</th>
-                <th className="p-2">Situação</th>
-                <th className="p-2">Ações</th>
+                <th className="p-2 sticky top-0 bg-white">Código</th>
+                <th className="p-2 sticky top-0 bg-white">Ano</th>
+                <th className="p-2 sticky top-0 bg-white">Contratante</th>
+                <th className="p-2 sticky top-0 bg-white">Data</th>
+                <th className="p-2 sticky top-0 bg-white">Situação</th>
+                <th className="p-2 sticky top-0 bg-white">Ações</th>
               </tr>
             </thead>
             <tbody>
               {paginated.map((l, i) => (
-                <tr key={i} className="border-t">
+                <tr key={i} className="border-t odd:bg-gray-50 hover:bg-gray-100">
                   {/* O código também abre a licitação: no celular a tabela rola
                       na horizontal e o botão "Ver Licitação", que é a última
                       coluna, fica fora da tela. A primeira coluna está sempre
@@ -232,8 +269,8 @@ export default function ListLicitacoes() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm">Página {listOptions.page} de {Math.max(1, Math.ceil(total / listOptions.pageSize))}</div>
             <div className="flex items-center gap-2">
-              <button disabled={listOptions.page <= 1} onClick={() => setListOptions((o: any) => ({ ...o, page: o.page - 1 }))} className="px-3 py-1 bg-gray-100 rounded">Anterior</button>
-              <button disabled={start + listOptions.pageSize >= total} onClick={() => setListOptions((o: any) => ({ ...o, page: o.page + 1 }))} className="px-3 py-1 bg-gray-100 rounded">Próxima</button>
+              <button disabled={listOptions.page <= 1} onClick={() => setListOptions((o: any) => ({ ...o, page: o.page - 1 }))} className="btn btn-ghost text-sm disabled:opacity-50">Anterior</button>
+              <button disabled={start + listOptions.pageSize >= total} onClick={() => setListOptions((o: any) => ({ ...o, page: o.page + 1 }))} className="btn btn-ghost text-sm disabled:opacity-50">Próxima</button>
               <select value={listOptions.pageSize} onChange={e => setListOptions((o: any) => ({ ...o, pageSize: Number(e.target.value), page: 1 }))} className="border p-1 rounded">
                 <option value={5}>5</option>
                 <option value={10}>10</option>
@@ -241,6 +278,8 @@ export default function ListLicitacoes() {
               </select>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

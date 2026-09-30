@@ -180,6 +180,23 @@ create table if not exists items (
 );
 create index if not exists items_licitacao_idx on items ("licitacaoCodigo");
 
+-- ============================================================
+-- entregas — controle de entrega pós-vitória: cada remessa entregue
+-- (quantidade, data, nota fiscal) por item vencedor, comparada com a
+-- quantidade contratada na tela de detalhe da licitação.
+-- ============================================================
+create table if not exists entregas (
+  id uuid primary key default gen_random_uuid(),
+  "itemId" uuid not null references items(id) on delete cascade,
+  quantidade numeric not null,
+  data text,
+  "notaFiscal" text,
+  observacao text,
+  "criadoEm" bigint,
+  "criadoPor" uuid references profiles(id) on delete set null default auth.uid()
+);
+create index if not exists entregas_item_idx on entregas ("itemId");
+
 -- Migração pra quem já tinha a tabela no modelo antigo de planilha (projeto
 -- já provisionado antes da troca pro "02. MODELO DE COTAÇÃO"): adiciona as
 -- colunas novas e remove as que não existem mais nesse modelo.
@@ -243,15 +260,50 @@ create table if not exists atas (
 create index if not exists atas_licitacao_idx on atas ("licitacaoCodigo");
 
 -- ============================================================
+-- propostas_emitidas — snapshot automático dos itens/valores no momento de
+-- cada emissão da Proposta de Preços em PDF. Sem isto, se um item mudasse de
+-- valor depois de emitida a proposta, não sobrava registro do que foi
+-- realmente enviado ao órgão — risco jurídico/operacional real em pregão.
+-- É histórico (como audit_logs): só insert, nunca update/delete.
+-- ============================================================
+create table if not exists propostas_emitidas (
+  id uuid primary key default gen_random_uuid(),
+  "licitacaoCodigo" bigint not null references licitacoes(codigo) on delete cascade,
+  snapshot jsonb not null,
+  "emitidoPor" uuid references profiles(id) on delete set null default auth.uid(),
+  "emitidoEm" bigint not null
+);
+create index if not exists propostas_emitidas_licitacao_idx on propostas_emitidas ("licitacaoCodigo");
+
+-- ============================================================
+-- metas — uma linha por mês ("YYYY-MM") com o alvo de valor ganho e taxa de
+-- sucesso, comparado com o realizado no card "Meta do mês" do Dashboard.
+-- ============================================================
+create table if not exists metas (
+  id uuid primary key default gen_random_uuid(),
+  periodo text not null unique,
+  "valorAlvoGanho" numeric,
+  "taxaAlvoSucesso" numeric,
+  "atualizadoEm" bigint,
+  "atualizadoPor" uuid references profiles(id) on delete set null default auth.uid()
+);
+
+-- ============================================================
 -- audit_logs
 -- ============================================================
 create table if not exists audit_logs (
   id uuid primary key default gen_random_uuid(),
   at bigint not null,
+  -- Texto livre, mantido só como legado/fallback de exibição. Nunca é a
+  -- fonte de verdade de quem fez a ação — isso é `user_id` (auth.uid()),
+  -- porque texto vindo do cliente é forjável (localStorage, API direta).
   "user" text,
+  user_id uuid references profiles(id) on delete set null default auth.uid(),
   action text not null,
   payload jsonb
 );
+
+create index if not exists audit_logs_at_idx on audit_logs (at desc);
 
 -- ============================================================
 -- Row Level Security — como cada projeto Supabase é dedicado a um cliente
@@ -264,8 +316,11 @@ alter table empresa_info enable row level security;
 alter table documentos_empresa enable row level security;
 alter table licitacoes enable row level security;
 alter table items enable row level security;
+alter table entregas enable row level security;
 alter table attachments enable row level security;
 alter table atas enable row level security;
+alter table propostas_emitidas enable row level security;
+alter table metas enable row level security;
 alter table audit_logs enable row level security;
 
 -- Função auxiliar: só quem tem profiles.ativo = true passa. SECURITY DEFINER
@@ -367,6 +422,9 @@ drop policy if exists "autenticado tudo em items" on items;
 drop policy if exists "membro ativo tudo em items" on items;
 create policy "membro ativo tudo em items" on items for all using (public.membro_ativo()) with check (public.membro_ativo());
 
+drop policy if exists "membro ativo tudo em entregas" on entregas;
+create policy "membro ativo tudo em entregas" on entregas for all using (public.membro_ativo()) with check (public.membro_ativo());
+
 drop policy if exists "autenticado tudo em attachments" on attachments;
 drop policy if exists "membro ativo tudo em attachments" on attachments;
 create policy "membro ativo tudo em attachments" on attachments for all using (public.membro_ativo()) with check (public.membro_ativo());
@@ -374,6 +432,30 @@ create policy "membro ativo tudo em attachments" on attachments for all using (p
 drop policy if exists "autenticado tudo em atas" on atas;
 drop policy if exists "membro ativo tudo em atas" on atas;
 create policy "membro ativo tudo em atas" on atas for all using (public.membro_ativo()) with check (public.membro_ativo());
+
+-- propostas_emitidas: mesmo espírito de audit_logs — só insert (histórico,
+-- nunca se edita/apaga). `emitido_por` segue o mesmo padrão anti-forjamento.
+drop policy if exists "membro ativo le/grava propostas_emitidas" on propostas_emitidas;
+create policy "membro ativo le/grava propostas_emitidas" on propostas_emitidas for select using (public.membro_ativo());
+drop policy if exists "membro ativo insere propostas_emitidas" on propostas_emitidas;
+create policy "membro ativo insere propostas_emitidas" on propostas_emitidas for insert with check (
+  public.membro_ativo() and ("emitidoPor" is null or "emitidoPor" = auth.uid())
+);
+
+-- metas: mesmo padrão de empresa_info — qualquer membro ativo lê, só admin
+-- grava (definir meta é decisão de gestão, não operação do dia a dia).
+drop policy if exists "membro ativo le metas" on metas;
+create policy "membro ativo le metas" on metas for select using (public.membro_ativo());
+drop policy if exists "admin grava metas" on metas;
+create policy "admin grava metas" on metas for insert with check (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+);
+drop policy if exists "admin atualiza metas" on metas;
+create policy "admin atualiza metas" on metas for update using (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+) with check (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+);
 
 -- audit_logs é só "for insert" + "for select restrito a admin ativo" de
 -- propósito (nunca "for all"): o app só precisa gravar e o admin ler — se
@@ -385,7 +467,21 @@ drop policy if exists "autenticado tudo em audit_logs" on audit_logs;
 drop policy if exists "autenticado insere em audit_logs" on audit_logs;
 drop policy if exists "membro ativo insere em audit_logs" on audit_logs;
 drop policy if exists "admin le audit_logs" on audit_logs;
-create policy "membro ativo insere em audit_logs" on audit_logs for insert with check (public.membro_ativo());
+-- `user_id is null or user_id = auth.uid()`: o default já preenche com o
+-- próprio usuário quando a coluna vem omitida do insert, então isso só
+-- importa se alguém tentar forçar um `user_id` de outra pessoa na mão.
+create policy "membro ativo insere em audit_logs" on audit_logs for insert with check (
+  public.membro_ativo() and (user_id is null or user_id = auth.uid())
+);
+-- Retenção/LGPD: admin pode apagar logs antigos (a tela sempre exporta pra
+-- Excel antes de apagar). Sem esta policy, RLS bloqueia delete de todo mundo.
+-- O piso de 180 dias é reforçado aqui, não só na tela — nem um admin
+-- consegue apagar log recente por essa via, propositalmente (ver 0012).
+drop policy if exists "admin apaga audit_logs antigos" on audit_logs;
+create policy "admin apaga audit_logs antigos" on audit_logs for delete using (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+  and at < (extract(epoch from now() - interval '180 days') * 1000)
+);
 create policy "admin le audit_logs" on audit_logs for select using (
   exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
 );

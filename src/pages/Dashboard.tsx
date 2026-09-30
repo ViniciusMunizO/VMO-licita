@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { listLicitacoes } from '../utils/licitacoes'
-import { listItems } from '../utils/items'
+import { listItemsByCodigos } from '../utils/items'
 import { combineDateTime, formatDateTimeBR, nowInBrasilia, splitLegacyDateTime, diasParaVencer } from '../utils/date'
 import { formatMoneyBRL, margemPercentual, formatFixed } from '../utils/format'
 import { situacaoDoItem } from '../utils/itens'
 import { listDocumentosEmpresa, DocumentoEmpresa } from '../utils/documentos'
+import { getMeta, saveMeta, Meta } from '../utils/metas'
 
 type Licitacao = {
   codigo: number
@@ -36,11 +37,16 @@ function haQuantoTempo(l: Licitacao, agora: number): string {
   return `há ${dias} dias`
 }
 
-function StatTile({ label, value }: { label: string; value: number | string }) {
+function StatTile({ label, value, destaque }: { label: string; value: number | string; destaque?: boolean }) {
   return (
     <div className="bg-white p-4 rounded shadow">
       <div className="text-sm text-gray-500">{label}</div>
-      <div className="text-3xl font-semibold mt-1" style={{ color: 'var(--color-primary)' }}>{value}</div>
+      <div
+        className={destaque ? 'text-3xl font-bold mt-1' : 'text-3xl font-semibold mt-1'}
+        style={{ color: destaque ? 'var(--color-accent)' : 'var(--color-primary)' }}
+      >
+        {value}
+      </div>
     </div>
   )
 }
@@ -116,6 +122,130 @@ function EvolucaoMensal({ licitacoes, hoje }: { licitacoes: Licitacao[]; hoje: s
   )
 }
 
+function MetaDoMesCard({ periodo, ganhoRealizado, taxaRealizada, isAdmin }: {
+  periodo: string
+  ganhoRealizado: number
+  taxaRealizada: number | null
+  isAdmin: boolean
+}) {
+  const [meta, setMeta] = useState<Meta | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [editando, setEditando] = useState(false)
+  const [valorAlvo, setValorAlvo] = useState('')
+  const [taxaAlvo, setTaxaAlvo] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    getMeta(periodo).then(m => {
+      if (!mounted) return
+      setMeta(m)
+      setValorAlvo(m?.valorAlvoGanho != null ? String(m.valorAlvoGanho) : '')
+      setTaxaAlvo(m?.taxaAlvoSucesso != null ? String(m.taxaAlvoSucesso) : '')
+      setLoading(false)
+    }).catch(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [periodo])
+
+  // Abre o formulário sempre a partir do valor real salvo — sem isto, um
+  // rascunho digitado e depois descartado com "Cancelar" ficava preso em
+  // `valorAlvo`/`taxaAlvo` (só são sincronizados com `meta` no mount) e
+  // reaparecia da próxima vez que o admin clicasse em "Editar", parecendo
+  // que a meta salva não avançou ou até sobrescrevendo-a por engano.
+  const abrirEdicao = () => {
+    setValorAlvo(meta?.valorAlvoGanho != null ? String(meta.valorAlvoGanho) : '')
+    setTaxaAlvo(meta?.taxaAlvoSucesso != null ? String(meta.taxaAlvoSucesso) : '')
+    setErro('')
+    setEditando(true)
+  }
+
+  const salvar = async () => {
+    setSalvando(true)
+    setErro('')
+    try {
+      const v = valorAlvo.trim() === '' ? null : Number(valorAlvo.replace(',', '.'))
+      const t = taxaAlvo.trim() === '' ? null : Number(taxaAlvo.replace(',', '.'))
+      if ((v !== null && !Number.isFinite(v)) || (t !== null && !Number.isFinite(t))) {
+        setErro('Valor inválido.')
+        return
+      }
+      const saved = await saveMeta(periodo, v, t)
+      setMeta(saved)
+      setEditando(false)
+    } catch (err: any) {
+      setErro(err?.message || 'Não foi possível salvar a meta.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  // Card silencioso enquanto carrega — o Dashboard já tem "Carregando..."
+  // pro resto da tela, duplicar o aviso aqui só polui.
+  if (loading) return null
+
+  const semMeta = !meta || (meta.valorAlvoGanho == null && meta.taxaAlvoSucesso == null)
+
+  return (
+    <div className="bg-white p-4 rounded shadow">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h4 className="font-semibold">Meta do mês</h4>
+        {isAdmin && !editando && (
+          <button type="button" onClick={abrirEdicao} className="text-xs link-primary">
+            {semMeta ? 'Definir meta' : 'Editar'}
+          </button>
+        )}
+      </div>
+
+      {editando ? (
+        <div className="space-y-2">
+          <div>
+            <label htmlFor="meta-valor" className="block text-xs text-gray-600">Valor a ganhar (R$)</label>
+            <input id="meta-valor" value={valorAlvo} onChange={e => setValorAlvo(e.target.value)} className="w-full p-2 rounded text-sm" placeholder="ex.: 50000" />
+          </div>
+          <div>
+            <label htmlFor="meta-taxa" className="block text-xs text-gray-600">Taxa de sucesso (%)</label>
+            <input id="meta-taxa" value={taxaAlvo} onChange={e => setTaxaAlvo(e.target.value)} className="w-full p-2 rounded text-sm" placeholder="ex.: 60" />
+          </div>
+          {erro && <p role="alert" className="text-xs" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={salvar} disabled={salvando} className="btn btn-primary text-xs disabled:opacity-50">{salvando ? 'Salvando...' : 'Salvar'}</button>
+            <button type="button" onClick={() => setEditando(false)} className="btn btn-ghost text-xs">Cancelar</button>
+          </div>
+        </div>
+      ) : semMeta ? (
+        <div className="text-sm text-gray-500">Nenhuma meta definida para este mês.</div>
+      ) : (
+        <div className="space-y-3">
+          {meta!.valorAlvoGanho != null && (
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-700">Valor ganho</span>
+                <span className="text-gray-500">{formatMoneyBRL(ganhoRealizado)} / {formatMoneyBRL(meta!.valorAlvoGanho)}</span>
+              </div>
+              <div className="h-2 rounded bg-gray-100 overflow-hidden">
+                <div className="h-full rounded" style={{ width: `${Math.min(100, (ganhoRealizado / meta!.valorAlvoGanho) * 100)}%`, backgroundColor: 'var(--color-accent)' }} />
+              </div>
+            </div>
+          )}
+          {meta!.taxaAlvoSucesso != null && (
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-700">Taxa de sucesso</span>
+                <span className="text-gray-500">{taxaRealizada === null ? '-' : `${formatFixed(taxaRealizada, 0)}%`} / {formatFixed(meta!.taxaAlvoSucesso, 0)}%</span>
+              </div>
+              <div className="h-2 rounded bg-gray-100 overflow-hidden">
+                <div className="h-full rounded" style={{ width: `${Math.min(100, ((taxaRealizada || 0) / meta!.taxaAlvoSucesso) * 100)}%`, backgroundColor: 'var(--color-accent)' }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BarList({ title, data }: { title: string; data: { label: string; count: number }[] }) {
   const max = Math.max(1, ...data.map(d => d.count))
   return (
@@ -149,9 +279,10 @@ export default function Dashboard() {
   const { user, logout } = useAuth()
   const [licitacoes, setLicitacoes] = useState<Licitacao[]>([])
   const [itemCounts, setItemCounts] = useState({ total: 0, vencedores: 0 })
-  const [financeiro, setFinanceiro] = useState({ totalGanho: 0, totalCustoGanho: 0, totalEmAberto: 0 })
+  const [financeiro, setFinanceiro] = useState({ totalGanho: 0, totalCustoGanho: 0, totalEmAberto: 0, ganhoMesAtual: 0 })
   const [documentosVencendo, setDocumentosVencendo] = useState<DocumentoEmpresa[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState('')
 
   useEffect(() => {
     let mounted = true
@@ -160,35 +291,44 @@ export default function Dashboard() {
       if (!mounted) return
       setLicitacoes(list)
 
-      const itemLists = await Promise.all(list.map(l => listItems(l.codigo)))
+      // Uma chamada só com `.in()` pra todos os itens de todas as licitações,
+      // em vez de uma chamada por licitação (N+1) — ver listItemsByCodigos.
+      const itemsPorCodigo = await listItemsByCodigos(list.map(l => l.codigo))
       if (!mounted) return
       let total = 0
       let vencedores = 0
       let totalGanho = 0
       let totalCustoGanho = 0
       let totalEmAberto = 0
-      list.forEach((l, i) => {
-        const items = itemLists[i]
-        if (!Array.isArray(items)) return
+      let ganhoMesAtual = 0
+      const mesAtual = nowInBrasilia().date.slice(0, 7)
+      for (const l of list) {
+        const items = itemsPorCodigo[String(l.codigo)] || []
         total += items.length
+        const mesLicitacao = splitLegacyDateTime(l.dataLicitacao).date.slice(0, 7)
         for (const it of items) {
           const situacao = situacaoDoItem(l, it)
           if (situacao === 'Vencedor') {
             vencedores++
             totalGanho += Number(it.valorGanho) || 0
             totalCustoGanho += Number(it.totalCusto) || 0
+            if (mesLicitacao === mesAtual) ganhoMesAtual += Number(it.valorGanho) || 0
           } else if (situacao === 'Em aberto') {
             // Licitação ainda sem resultado: o mínimo cotado é o valor "em
             // jogo" nesse item até sair o resultado.
             totalEmAberto += Number(it.valorTotalMinimo) || 0
           }
         }
-      })
+      }
       setItemCounts({ total, vencedores })
-      setFinanceiro({ totalGanho, totalCustoGanho, totalEmAberto })
+      setFinanceiro({ totalGanho, totalCustoGanho, totalEmAberto, ganhoMesAtual })
       setLoading(false)
     }
-    load()
+    load().catch(err => {
+      if (!mounted) return
+      setErro(err?.message || 'Não foi possível carregar o painel.')
+      setLoading(false)
+    })
     return () => { mounted = false }
   }, [])
 
@@ -239,6 +379,17 @@ export default function Dashboard() {
     return { total: licitacoes.length, thisYear, proximas, aguardandoResultado, taxaSucesso, decididas }
   }, [licitacoes, currentYear, now])
 
+  // Taxa de sucesso só das licitações decididas dentro do mês corrente —
+  // usada pra comparar com a meta do mês, separado da taxa geral (`stats`,
+  // que soma o histórico inteiro).
+  const statsMesAtual = useMemo(() => {
+    const doMes = licitacoes.filter(l => splitLegacyDateTime(l.dataLicitacao).date.slice(0, 7) === hoje.slice(0, 7))
+    const ganhou = doMes.filter(l => l.status === 'Ganhou').length
+    const perdeu = doMes.filter(l => l.status === 'Perdeu').length
+    const decididas = ganhou + perdeu
+    return { taxaSucesso: decididas > 0 ? (ganhou / decididas) * 100 : null, decididas }
+  }, [licitacoes, hoje])
+
   // Prazos de recurso/impugnação que vencem nos próximos 10 dias, ou já
   // vencidos — a licitação só some daqui quando o campo é limpo no
   // cadastro (não some sozinho por já ter status Ganhou/Perdeu, porque o
@@ -287,7 +438,7 @@ export default function Dashboard() {
             <h4 className="font-semibold">Documentos vencendo</h4>
             <span
               className="text-xs font-semibold text-white px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: 'var(--color-error)' }}
+              style={{ backgroundColor: 'var(--color-error-text)' }}
             >
               {documentosVencendo.length}
             </span>
@@ -298,7 +449,7 @@ export default function Dashboard() {
               return (
                 <li key={d.id} className="flex justify-between items-center gap-3 text-sm border-t pt-2 first:border-t-0 first:pt-0">
                   <span className="text-gray-700">{d.tipo}{d.numero ? ` — ${d.numero}` : ''}</span>
-                  <span className="text-xs font-medium flex-shrink-0" style={{ color: dias < 0 ? 'var(--color-error)' : '#b45309' }}>
+                  <span className="text-xs font-medium flex-shrink-0" style={{ color: dias < 0 ? 'var(--color-error-text)' : '#b45309' }}>
                     {dias < 0 ? `Venceu há ${Math.abs(dias)} dia(s)` : dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia(s)`}
                   </span>
                 </li>
@@ -315,7 +466,7 @@ export default function Dashboard() {
             <h4 className="font-semibold">Prazos de recurso/impugnação</h4>
             <span
               className="text-xs font-semibold text-white px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: 'var(--color-error)' }}
+              style={{ backgroundColor: 'var(--color-error-text)' }}
             >
               {prazosProximos.length}
             </span>
@@ -326,7 +477,7 @@ export default function Dashboard() {
                 <Link to={`/licitacoes/${p.codigo}`} className="link-primary">
                   {p.tipo} — {p.contratante} <span className="text-gray-500">(código {p.codigo})</span>
                 </Link>
-                <span className="text-xs font-medium flex-shrink-0" style={{ color: p.dias < 0 ? 'var(--color-error)' : '#b45309' }}>
+                <span className="text-xs font-medium flex-shrink-0" style={{ color: p.dias < 0 ? 'var(--color-error-text)' : '#b45309' }}>
                   {p.dias < 0 ? `Venceu há ${Math.abs(p.dias)} dia(s)` : p.dias === 0 ? 'Vence hoje' : `Vence em ${p.dias} dia(s)`}
                 </span>
               </li>
@@ -335,9 +486,11 @@ export default function Dashboard() {
         </div>
       )}
 
+      {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
+
       {loading ? (
         <div className="text-sm text-gray-500">Carregando...</div>
-      ) : licitacoes.length === 0 ? (
+      ) : erro ? null : licitacoes.length === 0 ? (
         <div className="bg-white p-6 rounded shadow text-center">
           <p className="text-gray-600">Nenhuma licitação cadastrada ainda.</p>
           <Link to="/licitacoes/novo" className="btn btn-primary mt-4 inline-flex">Cadastrar a primeira licitação</Link>
@@ -352,7 +505,7 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <StatTile label="Valor total ganho" value={formatMoneyBRL(financeiro.totalGanho)} />
+            <StatTile label="Valor total ganho" value={formatMoneyBRL(financeiro.totalGanho)} destaque />
             <StatTile label="Custo dos ganhos" value={formatMoneyBRL(financeiro.totalCustoGanho)} />
             <StatTile
               label="Margem dos ganhos"
@@ -361,12 +514,21 @@ export default function Dashboard() {
                 return m === null ? '-' : `${formatFixed(m)}%`
               })()}
             />
-            <StatTile label="Em jogo (aguardando resultado)" value={formatMoneyBRL(financeiro.totalEmAberto)} />
+            <StatTile label="Em jogo (aguardando resultado)" value={formatMoneyBRL(financeiro.totalEmAberto)} destaque />
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
             <StatTile label="Taxa de sucesso" value={stats.taxaSucesso === null ? '-' : `${formatFixed(stats.taxaSucesso, 0)}%`} />
             <StatTile label="Licitações decididas" value={stats.decididas} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 mb-6">
+            <MetaDoMesCard
+              periodo={hoje.slice(0, 7)}
+              ganhoRealizado={financeiro.ganhoMesAtual}
+              taxaRealizada={statsMesAtual.taxaSucesso}
+              isAdmin={user?.role === 'admin'}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -385,7 +547,7 @@ export default function Dashboard() {
                 {stats.aguardandoResultado.length > 0 && (
                   <span
                     className="text-xs font-semibold text-white px-2 py-0.5 rounded-full"
-                    style={{ backgroundColor: 'var(--color-error)' }}
+                    style={{ backgroundColor: 'var(--color-error-text)' }}
                   >
                     {stats.aguardandoResultado.length}
                   </span>
@@ -407,7 +569,7 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="text-gray-600">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</div>
-                          <div className="text-xs font-medium" style={{ color: 'var(--color-error)' }}>
+                          <div className="text-xs font-medium" style={{ color: 'var(--color-error-text)' }}>
                             {haQuantoTempo(l, now)}
                           </div>
                         </div>

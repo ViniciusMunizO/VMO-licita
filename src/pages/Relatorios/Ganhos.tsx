@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listLicitacoes } from '../../utils/licitacoes'
-import { listItems } from '../../utils/items'
+import { listItemsByCodigos } from '../../utils/items'
 import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed, formatMoneyBRL, margemPercentual } from '../../utils/format'
@@ -60,20 +60,25 @@ export default function RelatorioGanhos() {
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const [erro, setErro] = useState('')
   const hoje = nowInBrasilia().date
 
   const load = async () => {
     const list = await listLicitacoes()
     setLicitacoes(list)
-    const entries = await Promise.all(list.map(async (l: any) => {
-      const items = await listItems(l.codigo)
-      return [String(l.codigo), items] as const
-    }))
-    setItemsByCodigo(Object.fromEntries(entries))
+    // Uma chamada só com `.in()`, em vez de uma por licitação (N+1).
+    const porCodigo = await listItemsByCodigos(list.map((l: any) => l.codigo))
+    setItemsByCodigo(porCodigo)
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    setErro('')
+    load().catch(err => {
+      setErro(err?.message || 'Não foi possível carregar o relatório de ganhos.')
+      setLoading(false)
+    })
+  }, [])
 
   const toggleKralen = async (codigo: number, checked: boolean) => {
     const userName = localStorage.getItem('user_name') || undefined
@@ -225,9 +230,10 @@ export default function RelatorioGanhos() {
           </div>
         </div>
 
+        {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
         {loading ? (
           <div className="text-sm text-gray-500">Carregando...</div>
-        ) : ganhos.length === 0 ? (
+        ) : erro ? null : ganhos.length === 0 ? (
           <div className="text-sm text-gray-500">
             {termoBusca
               ? `Nenhum item ganho encontrado com "${busca}".`

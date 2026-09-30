@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { listItems, replaceItems } from '../utils/items'
 import { auditLog } from '../utils/audit'
+import { useModalA11y } from './useModalA11y'
 
 // Planilha "02. MODELO DE COTAÇÃO": tem um bloco de cabeçalho do pregão (linhas
 // 1-6, tamanho pode variar um pouco de arquivo pra arquivo) antes da tabela de
@@ -120,8 +121,14 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
   const [importando, setImportando] = useState(false)
 
   useEffect(() => {
+    if (!open) return
     let mounted = true
-    listItems(codigo).then(raw => { if (mounted) setItems(raw || []) })
+    setErro('')
+    listItems(codigo).then(raw => {
+      if (mounted) setItems(raw || [])
+    }).catch(err => {
+      if (mounted) setErro(err?.message || 'Não foi possível carregar os itens já importados.')
+    })
     return () => { mounted = false }
   }, [open, codigo])
 
@@ -165,10 +172,12 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
     }
   }
 
+  const modalRef = useModalA11y(open, onClose)
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
+    <div ref={modalRef} className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
       <div className="bg-white rounded shadow max-w-2xl w-full p-4">
         <div className="flex justify-between items-center mb-4">
           <h4 className="font-semibold">Importar Itens — Licitação {codigo}</h4>
@@ -191,7 +200,7 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
           </label>
         </div>
 
-        {erro && <p className="text-sm mt-2" style={{ color: 'var(--color-error)' }}>{erro}</p>}
+        {erro && <p role="alert" className="text-sm mt-2" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
 
         <div className="mt-4 max-h-64 overflow-auto rounded p-2">
           {items.length === 0 && <p className="text-sm text-gray-500">Nenhum item importado.</p>}

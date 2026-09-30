@@ -83,6 +83,22 @@ export async function listItems(licitacaoCodigo: number | string): Promise<any[]
   return data || []
 }
 
+// Mesma consulta que `listItems`, mas pra várias licitações de uma vez — usada
+// nas telas que precisam dos itens de toda a lista (Dashboard, relatórios).
+// Fazer `listItems` dentro de um `.map()` vira uma chamada ao banco por
+// licitação (N+1); isto troca por uma única chamada com `.in()`.
+export async function listItemsByCodigos(licitacaoCodigos: (number | string)[]): Promise<Record<string, any[]>> {
+  if (licitacaoCodigos.length === 0) return {}
+  const { data, error } = await supabase.from('items').select('*').in('licitacaoCodigo', licitacaoCodigos).order('created_at', { ascending: true })
+  if (error) throw error
+  const porCodigo: Record<string, any[]> = {}
+  for (const it of data || []) {
+    const k = String(it.licitacaoCodigo)
+    ;(porCodigo[k] ||= []).push(it)
+  }
+  return porCodigo
+}
+
 // Substitui todos os itens de uma licitação de uma vez — usado pela
 // importação de planilha, onde a lista inteira já é conhecida.
 //

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { DateInputBR } from './DateTimeBR'
 import { addMonthsToDate, formatDateBR } from '../utils/date'
 import { formatarTamanho, MAX_ANEXO_BYTES } from '../utils/arquivo'
+import { useModalA11y } from './useModalA11y'
 
 export type Ata = {
   id: string
@@ -43,6 +44,8 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
   const [showMesesPopup, setShowMesesPopup] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
+
+  const modalRef = useModalA11y(open, onClose)
 
   if (!open) return null
 
@@ -109,7 +112,7 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-auto">
+    <div ref={modalRef} className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-auto">
       <div className="bg-white rounded shadow max-w-xl w-full p-4">
         <div className="flex justify-between items-center mb-4">
           <h4 className="font-semibold">Nova Ata / Contrato</h4>
@@ -161,7 +164,7 @@ export default function AtaContratoModal({ open, onClose, onSave, criadoPor }: {
             <p className="text-xs text-gray-500 mt-1">Tamanho máximo: {formatarTamanho(MAX_ANEXO_BYTES)}.</p>
           </div>
 
-          {erro && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{erro}</p>}
+          {erro && <p role="alert" className="text-sm" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
 
           <button className="btn btn-primary disabled:opacity-50" type="submit" disabled={salvando}>
             {salvando ? 'Salvando...' : 'Salvar'}

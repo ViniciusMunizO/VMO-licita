@@ -144,7 +144,7 @@ export default function Login() {
                     />
                   </div>
                   {recuperarErro && (
-                    <div className="text-sm px-3 py-2 rounded-lg border-l-4" style={{ backgroundColor: '#fef2f2', borderColor: 'var(--color-error)', color: '#b91c1c' }}>
+                    <div role="alert" className="text-sm px-3 py-2 rounded-lg border-l-4" style={{ backgroundColor: '#fef2f2', borderColor: 'var(--color-error)', color: '#b91c1c' }}>
                       {recuperarErro}
                     </div>
                   )}
@@ -218,7 +218,7 @@ export default function Login() {
             </div>
 
             {error && (
-              <div className="text-sm px-3 py-2 rounded-lg border-l-4" style={{ backgroundColor: '#fef2f2', borderColor: 'var(--color-error)', color: '#b91c1c' }}>
+              <div role="alert" className="text-sm px-3 py-2 rounded-lg border-l-4" style={{ backgroundColor: '#fef2f2', borderColor: 'var(--color-error)', color: '#b91c1c' }}>
                 {error}
               </div>
             )}

@@ -47,6 +47,12 @@ defasagem silenciosa.
 | `0004_documentos_empresa.sql` | Cria `documentos_empresa` (certidões/documentos da empresa com data de validade), com RLS e `updated_at` automático. |
 | `0005_prazos_recurso_impugnacao.sql` | Adiciona `dataLimiteRecurso` e `dataLimiteImpugnacao` em `licitacoes`, usadas pelo alerta de prazos no Dashboard. |
 | `0006_empresa_info_somente_admin.sql` | Restringe gravação em `empresa_info` a admin ativo (leitura continua liberada pra qualquer membro ativo). |
+| `0007_audit_logs_user_id.sql` | Adiciona `user_id` (preenchido pelo Postgres via `auth.uid()`, não pelo texto que o cliente manda) em `audit_logs`, pra trilha de auditoria parar de confiar em texto forjável. Adiciona também o índice em `at` que faltava. |
+| `0008_audit_logs_retencao.sql` | Policy de delete em `audit_logs` restrita a admin ativo — usada pelo botão "Exportar e apagar logs antigos" da tela de auditoria (retenção/LGPD). |
+| `0009_propostas_emitidas.sql` | Cria `propostas_emitidas`: um snapshot automático dos itens/valores gravado a cada emissão da Proposta de Preços em PDF, pra existir um registro do que foi de fato enviado ao órgão mesmo que os dados mudem depois. |
+| `0010_metas.sql` | Cria `metas` (valor e taxa de sucesso alvo por mês), comparada com o realizado no card "Meta do mês" do Dashboard. Só admin define, qualquer membro ativo lê. |
+| `0011_entregas.sql` | Cria `entregas` (quantidade/data/nota fiscal por remessa entregue de um item vencedor), pra comparar entregue x contratado na tela de detalhe. Escopo menor do que "alerta de capacidade" — isso ficou de fora, precisaria de catálogo de produtos/estoque à parte. |
+| `0012_audit_logs_retencao_minima.sql` | **Corrige falha de segurança da 0008**: a policy de delete deixava admin apagar qualquer log, inclusive recém-criado. Agora só deixa apagar log com mais de 180 dias, reforçado no banco. Rode mesmo se já rodou a 0008. |
 
 ## Nota sobre o `0001_cotacao.sql`
 

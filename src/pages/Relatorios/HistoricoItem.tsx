@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listLicitacoes } from '../../utils/licitacoes'
-import { listItems } from '../../utils/items'
+import { listItemsByCodigos } from '../../utils/items'
 import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed } from '../../utils/format'
@@ -26,8 +26,8 @@ function contratanteUf(l: any) {
 
 const COR_SITUACAO: Record<SituacaoItem, string> = {
   Vencedor: '#15803d',
-  Perdido: 'var(--color-error)',
-  Desclassificado: 'var(--color-error)',
+  Perdido: 'var(--color-error-text)',
+  Desclassificado: 'var(--color-error-text)',
   'Em aberto': '#6b7280',
 }
 
@@ -54,6 +54,7 @@ export default function RelatorioHistoricoItem() {
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const [erro, setErro] = useState('')
   const hoje = nowInBrasilia().date
 
   const termoBusca = busca.trim().toLowerCase()
@@ -69,20 +70,23 @@ export default function RelatorioHistoricoItem() {
     }
     let mounted = true
     setLoading(true)
+    setErro('')
     const load = async () => {
       const list = await listLicitacoes()
       if (!mounted) return
       setLicitacoes(list)
-      const entries = await Promise.all(list.map(async (l: any) => {
-        const items = await listItems(l.codigo)
-        return [String(l.codigo), items] as const
-      }))
+      // Uma chamada só com `.in()`, em vez de uma por licitação (N+1).
+      const porCodigo = await listItemsByCodigos(list.map((l: any) => l.codigo))
       if (!mounted) return
-      setItemsByCodigo(Object.fromEntries(entries))
+      setItemsByCodigo(porCodigo)
       setLoaded(true)
       setLoading(false)
     }
-    load()
+    load().catch(err => {
+      if (!mounted) return
+      setErro(err?.message || 'Não foi possível carregar o histórico de itens.')
+      setLoading(false)
+    })
     return () => { mounted = false }
   }, [buscaValida, loaded])
 
@@ -174,9 +178,10 @@ export default function RelatorioHistoricoItem() {
           {periodo === 'custom' && (dataInicioCustom || dataFimCustom) ? ` (${dataInicioCustom ? formatDateTimeBR(dataInicioCustom) : '…'} até ${dataFimCustom ? formatDateTimeBR(dataFimCustom) : 'hoje'})` : ''}
         </div>
 
+        {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
         {loading ? (
           <div className="text-sm text-gray-500">Carregando...</div>
-        ) : !buscaValida ? (
+        ) : erro ? null : !buscaValida ? (
           <div className="text-sm text-gray-500">
             Digite ao menos 2 caracteres do nome ou marca do item pra ver o histórico de cotações anteriores.
           </div>

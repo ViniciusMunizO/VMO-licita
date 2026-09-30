@@ -7,6 +7,20 @@ export async function listAtas(licitacaoCodigo: number | string): Promise<any[]>
   return data || []
 }
 
+// Mesma consulta que `listAtas`, mas pra várias licitações de uma vez — ver
+// `listItemsByCodigos` em utils/items.ts (mesmo motivo: evitar N+1).
+export async function listAtasByCodigos(licitacaoCodigos: (number | string)[]): Promise<Record<string, any[]>> {
+  if (licitacaoCodigos.length === 0) return {}
+  const { data, error } = await supabase.from('atas').select('*').in('licitacaoCodigo', licitacaoCodigos).order('criadoEm', { ascending: true })
+  if (error) throw error
+  const porCodigo: Record<string, any[]> = {}
+  for (const a of data || []) {
+    const k = String(a.licitacaoCodigo)
+    ;(porCodigo[k] ||= []).push(a)
+  }
+  return porCodigo
+}
+
 export async function addAta(licitacaoCodigo: number | string, ata: any): Promise<any[]> {
   const { id, ...rest } = ata // id vem do form só pra estado local — o banco gera o de verdade
   const { error } = await supabase.from('atas').insert({ licitacaoCodigo, ...rest })

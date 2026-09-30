@@ -2,11 +2,12 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { exportElementsToPdf } from '../../utils/pdf'
-import { formatDateTimeBR, formatDateBR } from '../../utils/date'
+import { formatDateTimeBR, formatDateBR, formatEpochBR } from '../../utils/date'
 import { formatNumeric, calcTotalCusto, calcValorUnitMinimo, calcValorTotalMinimo, calcValorTotalMunicipio } from '../../utils/format'
 import AttachmentsModal from '../../components/AttachmentsModal'
 import AtaContratoModal, { Ata } from '../../components/AtaContratoModal'
 import DeclaracoesSection from '../../components/DeclaracoesSection'
+import EntregasSection from '../../components/EntregasSection'
 import PrintableChecklist from '../../components/PrintableChecklist'
 import PrintableProposta from '../../components/PrintableProposta'
 import { setLancadoNoKralen } from '../../utils/kralen'
@@ -19,7 +20,9 @@ import { listAtas, addAta, removeAta as removeAtaApi } from '../../utils/atas'
 import { getEmpresaInfo } from '../../utils/empresa'
 import { auditLog } from '../../utils/audit'
 import { confirmarRemocao } from '../../utils/confirmar'
+import { addPropostaEmitida, listPropostasEmitidas, PropostaEmitida } from '../../utils/propostas'
 import StatusBadge from '../../components/StatusBadge'
+import { useModalA11y } from '../../components/useModalA11y'
 
 // Limite de caracteres do motivo de desclassificação — grande o suficiente
 // pra uma explicação de verdade (o exemplo real do cliente tem ~140
@@ -81,6 +84,7 @@ export default function DetailLicitacao() {
   const [items, setItems] = useState<any[]>([])
   const [atas, setAtas] = useState<Ata[]>([])
   const [empresa, setEmpresa] = useState<any>(null)
+  const [propostasEmitidas, setPropostasEmitidas] = useState<PropostaEmitida[]>([])
   // Itens/anexos/atas/empresa chegam depois da licitação. Sem essa flag dava
   // pra clicar em "Emitir Proposta" nesse intervalo e sair um PDF sem CNPJ,
   // endereço nem conta bancária — e sem sequer perguntar qual conta usar.
@@ -118,26 +122,29 @@ export default function DetailLicitacao() {
       //
       // Cada bloco agora entra na tela por conta própria e o aviso diz qual
       // parte faltou, em vez de culpar as quatro.
-      const [resAt, resIt, resAtas, resEmpresa] = await Promise.allSettled([
+      const [resAt, resIt, resAtas, resEmpresa, resPropostas] = await Promise.allSettled([
         listAttachments(codigo!),
         listItems(codigo!),
         listAtas(codigo!),
         getEmpresaInfo(),
+        listPropostasEmitidas(Number(codigo)),
       ])
       if (mounted) {
         if (resAt.status === 'fulfilled') setAttachments(resAt.value)
         if (resIt.status === 'fulfilled') setItems(resIt.value)
         if (resAtas.status === 'fulfilled') setAtas(resAtas.value)
         if (resEmpresa.status === 'fulfilled') setEmpresa(resEmpresa.value)
+        if (resPropostas.status === 'fulfilled') setPropostasEmitidas(resPropostas.value)
 
         const falhas = [
           resAt.status === 'rejected' && 'anexos',
           resIt.status === 'rejected' && 'itens',
           resAtas.status === 'rejected' && 'atas/contratos',
           resEmpresa.status === 'rejected' && 'dados da empresa',
+          resPropostas.status === 'rejected' && 'histórico de propostas emitidas',
         ].filter(Boolean) as string[]
         if (falhas.length > 0) {
-          const detalhe = [resAt, resIt, resAtas, resEmpresa]
+          const detalhe = [resAt, resIt, resAtas, resEmpresa, resPropostas]
             .find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
           setErroDados(`Não consegui carregar: ${falhas.join(', ')}. O resto da licitação está na tela. ${detalhe?.reason?.message || ''}`.trim())
         }
@@ -212,6 +219,7 @@ export default function DetailLicitacao() {
   }
   const [showPropostaModal, setShowPropostaModal] = useState(false)
   const [bancoProposta, setBancoProposta] = useState('')
+  const propostaModalRef = useModalA11y(showPropostaModal, () => setShowPropostaModal(false))
 
   const gerarPropostaPdf = async (bancoId?: string) => {
     if (!propostaRef.current) return
@@ -220,6 +228,24 @@ export default function DetailLicitacao() {
       const userName = localStorage.getItem('user_name') || undefined
       await auditLog('proposta_emitida', { codigo: model.codigo, bancoId: bancoId ?? model.bancoId }, userName)
     } catch { /* ignore */ }
+    try {
+      // Retrato do que foi de fato impresso no PDF — se um item mudar de
+      // valor depois, este registro continua mostrando o que foi enviado.
+      const banco = (empresa?.bancos || []).find((b: any) => b.id === (bancoId ?? model.bancoId))
+      await addPropostaEmitida(model.codigo, {
+        numeroPregao: model.numeroPregao,
+        numeroProcesso: model.numeroProcesso,
+        contratante: model.contratante?.nome || model.contratado || '',
+        objetoLicitacao: model.objetoLicitacao,
+        banco: banco ? { apelido: banco.apelido, banco: banco.banco, agencia: banco.agencia, conta: banco.conta } : null,
+        items: items.map((it: any) => ({
+          item: it.item, lote: it.lote, marca: it.marca, descricao: it.descricao,
+          quantidade: it.quantidade, unidade: it.unidade,
+          valorUnitMinimo: it.valorUnitMinimo, valorTotalMinimo: it.valorTotalMinimo,
+        })),
+      })
+      setPropostasEmitidas(await listPropostasEmitidas(model.codigo))
+    } catch { /* snapshot é um registro a mais, nunca deve travar a emissão do PDF em si */ }
   }
 
   // Com mais de uma conta cadastrada, pergunta qual entra na proposta antes de
@@ -359,7 +385,7 @@ export default function DetailLicitacao() {
       </div>
 
       {erroDados && (
-        <div className="mt-4 p-3 rounded text-sm" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>
+        <div role="alert" className="mt-4 p-3 rounded text-sm" style={{ backgroundColor: 'var(--color-error-text)', color: '#fff' }}>
           {erroDados}
         </div>
       )}
@@ -394,7 +420,7 @@ export default function DetailLicitacao() {
                       {a.anexo ? <button onClick={() => abrirAnexoAta(a)} className="link-primary">{a.anexo.name}</button> : '-'}
                     </td>
                     <td className="p-2">
-                      <button onClick={() => removeAta(a.id)} className="btn text-xs" style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}>Remover</button>
+                      <button onClick={() => removeAta(a.id)} className="btn text-xs" style={{ backgroundColor: 'var(--color-error-text)', color: '#fff' }}>Remover</button>
                     </td>
                   </tr>
                 ))}
@@ -564,7 +590,7 @@ export default function DetailLicitacao() {
                         <td className="p-2" onClick={e => e.stopPropagation()}>
                           {it.desclassificado ? (
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-white px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--color-error)' }}>✕ Desclassificado</span>
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-white px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--color-error-text)' }}>✕ Desclassificado</span>
                               <button
                                 onClick={() => reverterDesclassificacao(idx)}
                                 className="text-xs text-gray-400 hover:text-gray-600 underline"
@@ -610,7 +636,7 @@ export default function DetailLicitacao() {
                               <button
                                 onClick={() => marcarDesclassificado(idx)}
                                 className="btn btn-ghost text-xs px-3 py-1.5 font-medium"
-                                style={{ color: 'var(--color-error)' }}
+                                style={{ color: 'var(--color-error-text)' }}
                               >
                                 Desclassificar
                               </button>
@@ -770,6 +796,8 @@ export default function DetailLicitacao() {
         )}
       </div>
 
+      <EntregasSection itensVencedores={items.filter((it: any) => it.vencedor)} />
+
       <DeclaracoesSection modelo={model} />
 
       <div className="mt-6">
@@ -804,20 +832,37 @@ export default function DetailLicitacao() {
         {carregandoDados && <span className="text-sm text-gray-500">Carregando dados...</span>}
       </div>
 
+      {propostasEmitidas.length > 0 && (
+        <div className="mt-3 text-xs text-gray-500">
+          <details>
+            <summary className="cursor-pointer select-none">Histórico de propostas emitidas ({propostasEmitidas.length})</summary>
+            <ul className="mt-2 space-y-1">
+              {propostasEmitidas.map(p => (
+                <li key={p.id} className="border-t pt-1 first:border-t-0 first:pt-0">
+                  {formatEpochBR(p.emitidoEm)} — {p.emitidoPor || 'usuário removido'}
+                  {p.snapshot?.banco?.apelido ? ` — conta "${p.snapshot.banco.apelido}"` : ''}
+                  {' — '}{(p.snapshot?.items || []).length} item(ns)
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      )}
+
       {showPropostaModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
+        <div ref={propostaModalRef} className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 sm:p-6 z-50 overflow-y-auto">
           <div className="bg-white rounded shadow max-w-lg w-full p-4 my-auto">
             <div className="flex justify-between items-center mb-4">
               <h4 className="font-semibold">Emitir Proposta — Licitação {model.codigo}</h4>
               <button onClick={() => setShowPropostaModal(false)} className="text-gray-500">Fechar</button>
             </div>
 
-            <label className="block text-sm text-gray-600 mb-1">Conta bancária que vai aparecer na proposta</label>
+            <label htmlFor="proposta-banco" className="block text-sm text-gray-600 mb-1">Conta bancária que vai aparecer na proposta</label>
             <select
+              id="proposta-banco"
               value={bancoProposta}
               onChange={e => setBancoProposta(e.target.value)}
               className="w-full p-2 rounded"
-              autoFocus
             >
               {(empresa?.bancos || []).map((b: any) => (
                 <option key={b.id} value={b.id}>

@@ -136,7 +136,10 @@ export async function exportElementsToPdf(
   }
 
   for (const el of elements) {
-    const canvas = await html2canvas(el, { scale: 3 })
+    // scale 2 já dá nitidez suficiente pra impressão A4 — em 3 o canvas de
+    // relatórios com centenas de linhas ficava gigante em memória (~55% mais
+    // pixel que o necessário) só pra fatiar em páginas logo em seguida.
+    const canvas = await html2canvas(el, { scale: 2 })
     const renderedFullHeight = (canvas.height * pdfWidth) / canvas.width
 
     if (renderedFullHeight <= availableH) {
