@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { listAttachments, addAttachment, addAttachmentFromDocumento, removeAttachment, getAttachmentData } from '../utils/attachments'
 import { listDocumentosEmpresa, DocumentoEmpresa } from '../utils/documentos'
 import { auditLog } from '../utils/audit'
+import { confirmarRemocao } from '../utils/confirmar'
 import { urlsAssinadas, urlAssinada, baixarAnexo, formatarTamanho, MAX_ANEXO_BYTES } from '../utils/arquivo'
 
 type Attachment = {
@@ -96,6 +97,7 @@ export default function AttachmentsModal({ open, onClose, codigo }: { open: bool
   }
 
   const remove = async (id: string) => {
+    if (!confirmarRemocao('este anexo')) return
     setErro('')
     try {
       const updated = await removeAttachment(id, codigo)

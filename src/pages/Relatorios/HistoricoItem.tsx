@@ -8,11 +8,12 @@ import { formatNumeric, formatFixed } from '../../utils/format'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
+import { situacaoDoItem, SituacaoItem } from '../../utils/itens'
 
 type Ocorrencia = {
   licitacao: any
   item: any
-  situacao: 'Vencedor' | 'Perdido' | 'Desclassificado' | 'Em aberto'
+  situacao: SituacaoItem
 }
 
 function contratanteNome(l: any) {
@@ -23,14 +24,7 @@ function contratanteUf(l: any) {
   return l.contratante?.uf || ''
 }
 
-function situacaoDoItem(l: any, it: any): Ocorrencia['situacao'] {
-  if (it.vencedor) return 'Vencedor'
-  if (it.desclassificado) return 'Desclassificado'
-  if (!l.status) return 'Em aberto'
-  return 'Perdido'
-}
-
-const COR_SITUACAO: Record<Ocorrencia['situacao'], string> = {
+const COR_SITUACAO: Record<SituacaoItem, string> = {
   Vencedor: '#15803d',
   Perdido: 'var(--color-error)',
   Desclassificado: 'var(--color-error)',
@@ -47,7 +41,12 @@ function Colgroup() {
 }
 
 export default function RelatorioHistoricoItem() {
-  const [loading, setLoading] = useState(true)
+  // Carrega licitações/itens só quando a busca vira válida (2+ caracteres),
+  // não no mount: a tela já exige uma busca pra mostrar qualquer resultado,
+  // então buscar tudo de cara faria uma leitura cara (todas as licitações +
+  // todos os itens) na maioria das vezes à toa.
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
   const [busca, setBusca] = useState('')
@@ -57,22 +56,35 @@ export default function RelatorioHistoricoItem() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const hoje = nowInBrasilia().date
 
+  const termoBusca = busca.trim().toLowerCase()
+  const buscaValida = termoBusca.length >= 2
+
   useEffect(() => {
+    if (!buscaValida || loaded) {
+      // Busca apagada antes do fetch anterior terminar: sem isto o
+      // `loading` ficava travado em `true` pra sempre, porque o fetch em
+      // andamento vai descobrir `mounted = false` e nunca chega a desligá-lo.
+      setLoading(false)
+      return
+    }
+    let mounted = true
+    setLoading(true)
     const load = async () => {
       const list = await listLicitacoes()
+      if (!mounted) return
       setLicitacoes(list)
       const entries = await Promise.all(list.map(async (l: any) => {
         const items = await listItems(l.codigo)
         return [String(l.codigo), items] as const
       }))
+      if (!mounted) return
       setItemsByCodigo(Object.fromEntries(entries))
+      setLoaded(true)
       setLoading(false)
     }
     load()
-  }, [])
-
-  const termoBusca = busca.trim().toLowerCase()
-  const buscaValida = termoBusca.length >= 2
+    return () => { mounted = false }
+  }, [buscaValida, loaded])
 
   const ocorrencias: Ocorrencia[] = !buscaValida ? [] : licitacoes
     .filter(l => dataDentroDoPeriodo(l.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
@@ -96,7 +108,9 @@ export default function RelatorioHistoricoItem() {
       'Custo Unit.': Number(it.valorCusto) || 0,
       'Custo Total': Number(it.totalCusto) || 0,
       Situação: situacao,
-      'Valor Ganho': it.vencedor ? Number(it.valorGanho) || 0 : '',
+      // `undefined` (não '') pra célula ficar realmente vazia na planilha
+      // em vez de virar texto misturado com número na mesma coluna.
+      'Valor Ganho': it.vencedor ? Number(it.valorGanho) || 0 : undefined,
     }))
     exportRowsToExcel(linhas, 'historico_item.xlsx', 'Histórico de Item')
   }
@@ -203,7 +217,7 @@ export default function RelatorioHistoricoItem() {
                     <td className="p-1.5 text-right">{formatFixed(it.valorCusto, 4)}</td>
                     <td className="p-1.5">
                       <span className="text-xs font-semibold" style={{ color: COR_SITUACAO[situacao] }}>
-                        {situacao}{situacao === 'Vencedor' && it.valorGanho ? ` — ${formatFixed(it.valorGanho)}` : ''}
+                        {situacao}{situacao === 'Vencedor' && it.valorGanho !== null && it.valorGanho !== undefined && it.valorGanho !== '' ? ` — ${formatFixed(it.valorGanho)}` : ''}
                       </span>
                     </td>
                   </tr>

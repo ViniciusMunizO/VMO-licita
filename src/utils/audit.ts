@@ -11,7 +11,7 @@ export type AuditEntry = {
 export async function auditLog(action: string, payload?: any, user?: string) {
   try {
     await supabase.from('audit_logs').insert({ at: Date.now(), user, action, payload })
-  } catch (err) {
+  } catch {
     // Log de auditoria nunca deve travar a ação principal do usuário.
   }
 }

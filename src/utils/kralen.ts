@@ -9,6 +9,6 @@ export async function setLancadoNoKralen(codigo: number, value: boolean, userNam
   await updateLicitacao(codigo, { lancadoNoKralen: value })
   try {
     await auditLog('licitacao_kralen_toggle', { codigo, lancadoNoKralen: value }, userName)
-  } catch (err) { /* ignore */ }
+  } catch { /* ignore */ }
   return listLicitacoes()
 }

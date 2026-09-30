@@ -12,12 +12,13 @@ import PrintableProposta from '../../components/PrintableProposta'
 import { setLancadoNoKralen } from '../../utils/kralen'
 import { getLicitacao, updateLicitacao } from '../../utils/licitacoes'
 import { listItems, updateItem } from '../../utils/items'
-import { MOTIVOS_DESCLASSIFICACAO, parseMotivo, formatMotivo } from '../../utils/itens'
+import { MOTIVOS_DESCLASSIFICACAO, PREFIXO_OUTRO, parseMotivo, formatMotivo } from '../../utils/itens'
 import { listAttachments, getAttachmentData } from '../../utils/attachments'
 import { uploadAnexo, removerDoStorage, urlAssinada } from '../../utils/arquivo'
 import { listAtas, addAta, removeAta as removeAtaApi } from '../../utils/atas'
 import { getEmpresaInfo } from '../../utils/empresa'
 import { auditLog } from '../../utils/audit'
+import { confirmarRemocao } from '../../utils/confirmar'
 import StatusBadge from '../../components/StatusBadge'
 
 // Limite de caracteres do motivo de desclassificação — grande o suficiente
@@ -25,6 +26,10 @@ import StatusBadge from '../../components/StatusBadge'
 // caracteres), mas evita que um texto absurdamente longo pese na gravação
 // no banco, estoure a célula da tabela nos relatórios ou infle o PDF.
 const MOTIVO_MAX_LENGTH = 500
+// O que é gravado é "Outro: <detalhe>" — descontar o prefixo aqui evita que o
+// campo deixe digitar mais do que cabe e o `saveMotivo` corte o final do
+// texto em silêncio na hora de gravar.
+const DETALHE_OUTRO_MAX_LENGTH = MOTIVO_MAX_LENGTH - PREFIXO_OUTRO.length
 
 const HABILITACAO_ITEMS: { key: string; label: string }[] = [
   { key: 'habilitacaoJuridica', label: 'Habilitação Jurídica' },
@@ -168,7 +173,7 @@ export default function DetailLicitacao() {
     try {
       const auditUser = localStorage.getItem('user_name') || undefined
       await auditLog('ata_create', { codigo, tipo: ata.tipo, numero: ata.numero }, auditUser)
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   // O link do arquivo é gerado no clique: o bucket é privado, então a URL é
@@ -197,6 +202,7 @@ export default function DetailLicitacao() {
   const abrirAnexoAta = (ata: any) => abrirEm(async () => ata.anexo?.path ? urlAssinada(ata.anexo.path) : (ata.anexo?.data || null))
 
   const removeAta = async (id: string) => {
+    if (!confirmarRemocao('esta ata/contrato')) return
     try {
       const list = await removeAtaApi(id, codigo!)
       setAtas(list)
@@ -213,7 +219,7 @@ export default function DetailLicitacao() {
     try {
       const userName = localStorage.getItem('user_name') || undefined
       await auditLog('proposta_emitida', { codigo: model.codigo, bancoId: bancoId ?? model.bancoId }, userName)
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   // Com mais de uma conta cadastrada, pergunta qual entra na proposta antes de
@@ -262,7 +268,7 @@ export default function DetailLicitacao() {
     try {
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('item_valor_ganho', { codigo: model.codigo, itemIndex: idx, valorGanho: valor, descricao: list[idx].descricao }, user)
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   const [motivoDraft, setMotivoDraft] = useState<Record<number, { categoria: string; detalhe: string }>>({})
@@ -278,7 +284,7 @@ export default function DetailLicitacao() {
     try {
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('item_desclassificar', { codigo: model.codigo, itemIndex: idx, descricao: list[idx].descricao }, user)
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   const reverterDesclassificacao = async (idx: number) => {
@@ -298,7 +304,7 @@ export default function DetailLicitacao() {
     try {
       const user = localStorage.getItem('user_name') || undefined
       await auditLog('item_motivo_desclassificacao', { codigo: model.codigo, itemIndex: idx, motivo: motivoLimitado, descricao: list[idx].descricao }, user)
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   const startEditItem = (idx: number) => {
@@ -320,7 +326,7 @@ export default function DetailLicitacao() {
     try {
       const auditUser = localStorage.getItem('user_name') || undefined
       await auditLog('item_edit', { codigo: model.codigo, itemIndex: idx, descricao: list[idx].descricao }, auditUser)
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   const hasLotes = items.some(it => it.lote)
@@ -577,7 +583,7 @@ export default function DetailLicitacao() {
                                   try {
                                     const user = localStorage.getItem('user_name') || undefined
                                     await auditLog('item_mark_winner', { codigo: model.codigo, itemIndex: idx, vencedor: false, descricao: list[idx].descricao }, user)
-                                  } catch (err) { /* ignore */ }
+                                  } catch { /* ignore */ }
                                 }}
                                 className="text-xs text-gray-400 hover:text-gray-600 underline"
                               >
@@ -595,7 +601,7 @@ export default function DetailLicitacao() {
                                   try {
                                     const user = localStorage.getItem('user_name') || undefined
                                     await auditLog('item_mark_winner', { codigo: model.codigo, itemIndex: idx, vencedor: true, descricao: list[idx].descricao }, user)
-                                  } catch (err) { /* ignore */ }
+                                  } catch { /* ignore */ }
                                 }}
                                 className="btn btn-ghost text-xs px-3 py-1.5 font-medium"
                               >
@@ -628,15 +634,20 @@ export default function DetailLicitacao() {
                                       {MOTIVOS_DESCLASSIFICACAO.map(m => <option key={m} value={m}>{m}</option>)}
                                     </select>
                                     {motivoAtual.categoria === 'Outro' && (
-                                      <input
-                                        type="text"
-                                        placeholder="Detalhar o motivo"
-                                        maxLength={MOTIVO_MAX_LENGTH}
-                                        value={motivoAtual.detalhe}
-                                        onChange={e => setMotivoDraft(d => ({ ...d, [idx]: { categoria: 'Outro', detalhe: e.target.value } }))}
-                                        onKeyDown={e => { if (e.key === 'Enter') saveMotivo(idx) }}
-                                        className="w-48 p-1 rounded text-sm"
-                                      />
+                                      <div className="flex flex-col">
+                                        <input
+                                          type="text"
+                                          placeholder="Detalhar o motivo"
+                                          maxLength={DETALHE_OUTRO_MAX_LENGTH}
+                                          value={motivoAtual.detalhe}
+                                          onChange={e => setMotivoDraft(d => ({ ...d, [idx]: { categoria: 'Outro', detalhe: e.target.value } }))}
+                                          onKeyDown={e => { if (e.key === 'Enter') saveMotivo(idx) }}
+                                          className="w-48 p-1 rounded text-sm"
+                                        />
+                                        <span className="text-[10px] text-gray-400 mt-0.5">
+                                          {motivoAtual.detalhe.length}/{DETALHE_OUTRO_MAX_LENGTH}
+                                        </span>
+                                      </div>
                                     )}
                                   </div>
                                   <button
@@ -837,7 +848,7 @@ export default function DetailLicitacao() {
         try {
           const rawAt = await listAttachments(model.codigo)
           setAttachments(rawAt)
-        } catch (err) { /* ignore */ }
+        } catch { /* ignore */ }
       }} codigo={Number(model.codigo)} />
 
       <AtaContratoModal

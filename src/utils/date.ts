@@ -60,6 +60,18 @@ export function nowDateExtensoBR(): string {
   return `${get('day')} de ${get('month')} de ${get('year')}`
 }
 
+// Dias até uma data "YYYY-MM-DD" (negativo = já passou). Null quando `data`
+// está vazia ou não é uma data válida. Genérico — usado tanto pro alerta de
+// validade de documentos da empresa quanto pro alerta de prazos de
+// recurso/impugnação no Dashboard.
+export function diasParaVencer(data: string | null | undefined, hoje: string): number | null {
+  if (!data) return null
+  const a = new Date(`${data}T00:00:00`)
+  const b = new Date(`${hoje}T00:00:00`)
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null
+  return Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
+}
+
 // Soma meses a uma data "YYYY-MM-DD", usado para calcular o fim de vigência
 // de uma ata/contrato a partir do início + quantidade de meses.
 export function addMonthsToDate(dateValue: string, months: number): string {

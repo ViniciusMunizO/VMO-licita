@@ -6,22 +6,6 @@
     <!-- símbolo da VMO Sistemas; regerar com scripts/_gerar-favicon.js se a logo mudar -->
     <link rel="icon" type="image/png" href="/favicon.png" />
     <title>Licita-VMO</title>
-    <!-- Contraparte do public/404.html: decodifica o caminho original e
-         restaura a URL real antes do React Router montar. -->
-    <script>
-      (function () {
-        var search = window.location.search
-        if (search[1] === '/') {
-          var decoded = search.slice(1).split('&').map(function (s) {
-            return s.replace(/~and~/g, '&')
-          })
-          window.history.replaceState(
-            null, null,
-            window.location.pathname.slice(0, -1) + decoded[0] + (decoded.slice(1).length ? '?' + decoded.slice(1).join('&') : '') + window.location.hash
-          )
-        }
-      })()
-    </script>
   </head>
   <body>
     <div id="root"></div>

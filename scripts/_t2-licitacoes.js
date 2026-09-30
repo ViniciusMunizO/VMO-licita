@@ -16,8 +16,11 @@ async function main() {
   let t = await H.texto(page)
   H.check('listagem mostra a tabela com licitações existentes', t.includes('Código') && t.includes('Ver Licitação'))
 
-  const totalAntes = await page.$eval('.bg-white.p-4 .text-sm:last-child', el => el.textContent).catch(() => '')
   H.check('listagem mostra contador de resultados', /Resultados:\s*\d+/.test(t), t.match(/Resultados:\s*\d+/)?.[0])
+  // total real, não um número fixo — pra "Limpar filtros" poder conferir que
+  // volta exatamente pra esse valor, não pra um total chutado na hora de
+  // escrever o teste (que muda toda vez que mais licitações são criadas).
+  const totalAntes = t.match(/Resultados:\s*\d+/)?.[0]
 
   // filtro por código
   await page.type('input[placeholder="Código"]', '86')
@@ -25,10 +28,10 @@ async function main() {
   t = await H.texto(page)
   H.check('filtro por código funciona', t.includes('Resultados: 1'), t.match(/Resultados:\s*\d+/)?.[0])
 
-  await H.clicarPorTexto(page, 'Limpar')
+  await H.clicarPorTexto(page, 'Limpar filtros')
   await new Promise(r => setTimeout(r, 700))
   t = await H.texto(page)
-  H.check('botão Limpar restaura os filtros', !t.includes('Resultados: 1') || t.includes('Resultados: 3'), t.match(/Resultados:\s*\d+/)?.[0])
+  H.check('botão "Limpar filtros" restaura os filtros', t.match(/Resultados:\s*\d+/)?.[0] === totalAntes, `esperado: ${totalAntes}, obtido: ${t.match(/Resultados:\s*\d+/)?.[0]}`)
 
   // busca geral (procura por item dentro da licitação)
   await page.type('input[placeholder="Busca geral (itens/observações)"]', 'SONDA')
@@ -36,7 +39,7 @@ async function main() {
   t = await H.texto(page)
   H.check('busca geral encontra licitação pelo conteúdo dos itens', /Resultados:\s*[1-9]/.test(t), t.match(/Resultados:\s*\d+/)?.[0])
 
-  await H.clicarPorTexto(page, 'Limpar')
+  await H.clicarPorTexto(page, 'Limpar filtros')
   await new Promise(r => setTimeout(r, 500))
 
   // filtro que não retorna nada
@@ -52,8 +55,10 @@ async function main() {
   const codigoPreview = await page.$$eval('input[readonly]', els => els[0]?.value)
   H.check('formulário sugere o próximo código automaticamente', /^\d+$/.test(String(codigoPreview)), `código: ${codigoPreview}`)
 
+  // Não compara com um nome fixo: a suíte roda com qualquer conta de teste,
+  // então o que importa é que o campo venha preenchido (não vazio).
   const criadoPor = await page.$$eval('input[readonly]', els => els[1]?.value)
-  H.check('formulário preenche "Criado por" com o usuário logado', criadoPor === 'Vinicius', `valor: ${criadoPor}`)
+  H.check('formulário preenche "Criado por" com o usuário logado', !!criadoPor, `valor: ${criadoPor}`)
 
   // preenche campos
   const preencher = async (placeholderOuLabel, valor) => {
@@ -94,7 +99,7 @@ async function main() {
     H.check('campos gravados corretamente', criadas[0].numeroProcesso === 'PROC-E2E-001' && criadas[0].portal === 'COMPRASNET' && criadas[0].status === 'Ganhou',
       JSON.stringify({ p: criadas[0].numeroProcesso, portal: criadas[0].portal, s: criadas[0].status }))
     H.check('código gerado pelo banco (identity), não pelo cliente', typeof criadas[0].codigo === 'number' && criadas[0].codigo > 0, `código: ${criadas[0].codigo}`)
-    H.check('criadoPor gravado', criadas[0].criadoPor === 'Vinicius', `valor: ${criadas[0].criadoPor}`)
+    H.check('criadoPor gravado', criadas[0].criadoPor === criadoPor, `valor: ${criadas[0].criadoPor}`)
   }
 
   H.secao('5. Editar licitação')

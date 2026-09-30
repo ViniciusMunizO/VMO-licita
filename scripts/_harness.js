@@ -1,5 +1,12 @@
 const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const puppeteer = require('puppeteer')
+
+// PDFs gerados pelos testes (relatórios, proposta, declarações) não podem
+// cair na pasta de Downloads de verdade de quem roda a suíte — cada um vira
+// uma pasta descartável dentro do temp do sistema, nunca tocada por fora daqui.
+const PASTA_DOWNLOADS_TESTE = fs.mkdtempSync(path.join(os.tmpdir(), 'licitavmo-e2e-'))
 
 const envRaw = fs.readFileSync(__dirname + '/../.env', 'utf8')
 const env = Object.fromEntries(envRaw.split('\n').filter(Boolean).map(l => {
@@ -55,10 +62,21 @@ function resumo() {
 }
 
 async function novoBrowser() {
-  const browser = await puppeteer.launch()
+  // `headless: true` explícito (não depender do default da versão) e
+  // download redirecionado pra pasta descartável do teste — nenhum PDF
+  // gerado pela suíte deve aparecer na pasta de Downloads nem na tela de
+  // quem está rodando.
+  const browser = await puppeteer.launch({ headless: true })
   const page = await browser.newPage()
+  const cdp = await page.createCDPSession()
+  await cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: PASTA_DOWNLOADS_TESTE })
   await page.setViewport({ width: 1600, height: 1000 })
   const erros = []
+  // Ações destrutivas (remover anexo/ata/documento/conta) agora pedem
+  // confirm() nativo — sem aceitar automaticamente aqui, todo clique em
+  // "Remover" ficaria bloqueado esperando um diálogo que o Puppeteer nunca
+  // responde sozinho.
+  page.on('dialog', dialog => dialog.accept())
   page.on('pageerror', e => erros.push('pageerror: ' + String(e)))
   page.on('console', msg => {
     if (msg.type() === 'error') {

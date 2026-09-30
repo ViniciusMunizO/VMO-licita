@@ -69,13 +69,3 @@ export async function removeDocumentoEmpresa(id: string): Promise<DocumentoEmpre
   if (row?.path) await removerDoStorage([row.path]).catch(() => { /* documento já saiu da lista */ })
   return listDocumentosEmpresa()
 }
-
-// Dias até o vencimento (negativo = já venceu). Null quando o documento não
-// tem validade cadastrada.
-export function diasParaVencer(dataValidade: string | null | undefined, hoje: string): number | null {
-  if (!dataValidade) return null
-  const a = new Date(`${dataValidade}T00:00:00`)
-  const b = new Date(`${hoje}T00:00:00`)
-  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null
-  return Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
-}

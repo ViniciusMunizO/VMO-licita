@@ -1,19 +1,24 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense, lazy } from 'react'
 import { Routes, Route, Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import ListLicitacoes from './pages/Licitacoes/List'
-import FormLicitacao from './pages/Licitacoes/Form'
-import DetailLicitacao from './pages/Licitacoes/Detail'
-import RelatoriosIndex from './pages/Relatorios/Index'
-import Users from './pages/Users'
-import CompanyInfo from './pages/CompanyInfo'
-import AdminAudit from './pages/AdminAudit'
 import { AdminRoute } from './components/AdminRoute'
 import { useAuth } from './context/AuthContext'
 import Logo from './components/Logo'
 import { IconLicitacoes, IconRelatorios, IconEmpresa, IconUsuarios, IconMenu, IconFechar } from './components/NavIcons'
+
+// Cada página vira um chunk próprio, baixado só quando a rota é visitada —
+// sem isso, jsPDF/html2canvas/xlsx (usados só em algumas telas) entravam
+// todos no bundle inicial, que passava de 1,5 MB antes disso.
+const Login = lazy(() => import('./pages/Login'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ListLicitacoes = lazy(() => import('./pages/Licitacoes/List'))
+const FormLicitacao = lazy(() => import('./pages/Licitacoes/Form'))
+const DetailLicitacao = lazy(() => import('./pages/Licitacoes/Detail'))
+const RelatoriosIndex = lazy(() => import('./pages/Relatorios/Index'))
+const Users = lazy(() => import('./pages/Users'))
+const CompanyInfo = lazy(() => import('./pages/CompanyInfo'))
+const AdminAudit = lazy(() => import('./pages/AdminAudit'))
 
 function NavItem({ to, icon, children, onClick }: { to: string; icon: React.ReactNode; children: React.ReactNode; onClick?: () => void }) {
   return (
@@ -40,7 +45,7 @@ function iniciais(nome?: string) {
 }
 
 export default function App() {
-  const { user, logout } = useAuth()
+  const { user, logout, passwordRecovery } = useAuth()
   const nav = useNavigate()
   const location = useLocation()
   // Abaixo de `lg` os itens viram gaveta. O corte é em `lg` e não em `md`
@@ -52,6 +57,11 @@ export default function App() {
   useEffect(() => { setMenuAberto(false) }, [location.pathname])
 
   const sair = () => { setMenuAberto(false); logout(); nav('/login') }
+
+  // Trava em "definir senha nova" independente da rota — o link do e-mail já
+  // autentica a sessão, então sem isto quem clicasse no link entraria direto
+  // no sistema com esse login temporário em vez de trocar a senha primeiro.
+  if (passwordRecovery) return <ResetPassword />
 
   if (user && !user.ativo) {
     return (
@@ -84,7 +94,9 @@ export default function App() {
               <div className="hidden lg:flex items-center gap-1">
                 <NavItem to="/licitacoes" icon={<IconLicitacoes />}>Licitações</NavItem>
                 <NavItem to="/relatorios" icon={<IconRelatorios />}>Relatórios</NavItem>
-                <NavItem to="/empresa" icon={<IconEmpresa />}>Informações da Empresa</NavItem>
+                {user?.role === 'admin' && (
+                  <NavItem to="/empresa" icon={<IconEmpresa />}>Informações da Empresa</NavItem>
+                )}
                 {(user?.role === 'admin' || user?.role === 'moderador') && (
                   <NavItem to="/users" icon={<IconUsuarios />}>Usuários</NavItem>
                 )}
@@ -120,7 +132,9 @@ export default function App() {
               <div className="container-fixed py-2 flex flex-col gap-0.5">
                 <NavItem to="/licitacoes" icon={<IconLicitacoes />} onClick={() => setMenuAberto(false)}>Licitações</NavItem>
                 <NavItem to="/relatorios" icon={<IconRelatorios />} onClick={() => setMenuAberto(false)}>Relatórios</NavItem>
-                <NavItem to="/empresa" icon={<IconEmpresa />} onClick={() => setMenuAberto(false)}>Informações da Empresa</NavItem>
+                {user?.role === 'admin' && (
+                  <NavItem to="/empresa" icon={<IconEmpresa />} onClick={() => setMenuAberto(false)}>Informações da Empresa</NavItem>
+                )}
                 {(user?.role === 'admin' || user?.role === 'moderador') && (
                   <NavItem to="/users" icon={<IconUsuarios />} onClick={() => setMenuAberto(false)}>Usuários</NavItem>
                 )}
@@ -134,17 +148,20 @@ export default function App() {
         </nav>
       )}
       <main className={user ? 'container-fixed py-4 sm:py-6' : ''}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/licitacoes" element={<ProtectedRoute><ListLicitacoes /></ProtectedRoute>} />
-          <Route path="/licitacoes/novo" element={<ProtectedRoute><FormLicitacao /></ProtectedRoute>} />
-          <Route path="/licitacoes/:codigo" element={<ProtectedRoute><DetailLicitacao /></ProtectedRoute>} />
-          <Route path="/relatorios" element={<ProtectedRoute><RelatoriosIndex /></ProtectedRoute>} />
-          <Route path="/empresa" element={<ProtectedRoute><CompanyInfo /></ProtectedRoute>} />
-          <Route path="/users" element={<AdminRoute roles={['admin', 'moderador']}><Users /></AdminRoute>} />
-          <Route path="/admin/audit" element={<AdminRoute><AdminAudit /></AdminRoute>} />
-        </Routes>
+        <Suspense fallback={<div className="text-sm text-gray-500 p-6">Carregando...</div>}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/redefinir-senha" element={<ResetPassword />} />
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/licitacoes" element={<ProtectedRoute><ListLicitacoes /></ProtectedRoute>} />
+            <Route path="/licitacoes/novo" element={<ProtectedRoute><FormLicitacao /></ProtectedRoute>} />
+            <Route path="/licitacoes/:codigo" element={<ProtectedRoute><DetailLicitacao /></ProtectedRoute>} />
+            <Route path="/relatorios" element={<ProtectedRoute><RelatoriosIndex /></ProtectedRoute>} />
+            <Route path="/empresa" element={<AdminRoute><CompanyInfo /></AdminRoute>} />
+            <Route path="/users" element={<AdminRoute roles={['admin', 'moderador']}><Users /></AdminRoute>} />
+            <Route path="/admin/audit" element={<AdminRoute><AdminAudit /></AdminRoute>} />
+          </Routes>
+        </Suspense>
       </main>
     </div>
   )

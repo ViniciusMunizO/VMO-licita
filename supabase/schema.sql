@@ -1,4 +1,4 @@
--- Botti Licita — schema Postgres/Supabase
+-- Licita-VMO — schema Postgres/Supabase
 --
 -- Script de provisionamento: roda inteiro, uma vez, num projeto Supabase
 -- novo (Dashboard -> SQL Editor -> cola e executa). Depois dele, rode os
@@ -135,11 +135,18 @@ create table if not exists licitacoes (
   -- documentos (Proposta/Declarações) desta licitação. Null = usa a
   -- primeira conta cadastrada.
   "bancoId" text,
+  -- Data-limite (YYYY-MM-DD) pra apresentar recurso/impugnação, se houver.
+  -- Diferente de "prazoValidade" (texto livre, cláusula contratual) — aqui é
+  -- data de verdade, usada pro alerta do Dashboard. Vazio = não se aplica.
+  "dataLimiteRecurso" text,
+  "dataLimiteImpugnacao" text,
   "criadoPor" text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 alter table licitacoes add column if not exists "bancoId" text;
+alter table licitacoes add column if not exists "dataLimiteRecurso" text;
+alter table licitacoes add column if not exists "dataLimiteImpugnacao" text;
 
 -- ============================================================
 -- items — uma linha por item de licitação (não mais um array só). É essa
@@ -331,9 +338,23 @@ drop policy if exists "autenticado tudo em contratantes" on contratantes;
 drop policy if exists "membro ativo tudo em contratantes" on contratantes;
 create policy "membro ativo tudo em contratantes" on contratantes for all using (public.membro_ativo()) with check (public.membro_ativo());
 
+-- Qualquer membro ativo lê (proposta/declaração precisam disso pra qualquer
+-- usuário que emite, não só admin), mas só admin grava — dado sensível
+-- (CNPJ, conta bancária, dados do representante legal).
 drop policy if exists "autenticado tudo em empresa_info" on empresa_info;
 drop policy if exists "membro ativo tudo em empresa_info" on empresa_info;
-create policy "membro ativo tudo em empresa_info" on empresa_info for all using (public.membro_ativo()) with check (public.membro_ativo());
+drop policy if exists "membro ativo le empresa_info" on empresa_info;
+drop policy if exists "admin grava empresa_info" on empresa_info;
+drop policy if exists "admin atualiza empresa_info" on empresa_info;
+create policy "membro ativo le empresa_info" on empresa_info for select using (public.membro_ativo());
+create policy "admin grava empresa_info" on empresa_info for insert with check (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+);
+create policy "admin atualiza empresa_info" on empresa_info for update using (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+) with check (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+);
 
 drop policy if exists "membro ativo tudo em documentos_empresa" on documentos_empresa;
 create policy "membro ativo tudo em documentos_empresa" on documentos_empresa for all using (public.membro_ativo()) with check (public.membro_ativo());

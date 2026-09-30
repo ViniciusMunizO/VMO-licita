@@ -40,7 +40,7 @@ async function carregarLogo(): Promise<{ dataUrl: string; aspecto: number } | nu
       aspecto: img.naturalWidth / img.naturalHeight,
     }
     return logoCache
-  } catch (err) {
+  } catch {
     // Sem a logo o documento ainda sai — só com o título.
     return null
   }

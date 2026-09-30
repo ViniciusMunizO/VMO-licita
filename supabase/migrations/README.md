@@ -11,6 +11,11 @@ ambiente**, colado no SQL Editor do Supabase.
 Num projeto novo, só o `0001_` tem efeito de verdade — o `0002_` e o `0003_`
 existem pra desfazer coisa que projeto novo nunca chegou a ter.
 
+Isso aqui é só a parte do banco. Pra provisionar um **cliente novo** de
+ponta a ponta (usuário admin, bucket de anexos, segurança, Render, e como
+validar que pegou de verdade antes de considerar pronto), siga
+[`supabase/PROVISIONAMENTO.md`](../PROVISIONAMENTO.md).
+
 ## Aplicar num banco que já está rodando
 
 Só os arquivos que ainda não foram aplicados naquele ambiente.
@@ -40,6 +45,8 @@ defasagem silenciosa.
 | `0002_remover_planilha_fortune_sheet.sql` | **Apaga dados.** Derruba `planilhas` e `planilha_modelos`, da planilha livre estilo Excel que foi descartada. Opcional — rode quando tiver certeza. |
 | `0003_remover_cotacao.sql` | Desfaz a grade de cotação dentro do cadastro, também descartada: derruba `cotacao_colunas`, `cotacao_modelos`, a RPC `salvar_licitacao_com_itens` e as colunas que só ela usava em `items`. Só tem efeito em quem rodou a versão antiga do `0001_cotacao.sql`. |
 | `0004_documentos_empresa.sql` | Cria `documentos_empresa` (certidões/documentos da empresa com data de validade), com RLS e `updated_at` automático. |
+| `0005_prazos_recurso_impugnacao.sql` | Adiciona `dataLimiteRecurso` e `dataLimiteImpugnacao` em `licitacoes`, usadas pelo alerta de prazos no Dashboard. |
+| `0006_empresa_info_somente_admin.sql` | Restringe gravação em `empresa_info` a admin ativo (leitura continua liberada pra qualquer membro ativo). |
 
 ## Nota sobre o `0001_cotacao.sql`
 

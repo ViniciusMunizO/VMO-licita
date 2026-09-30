@@ -98,20 +98,37 @@ async function main() {
     Number(it?.quantidade) === 1000 && Number(it?.valorCusto) === 3,
     JSON.stringify({ qtd: it?.quantidade, custo: it?.valorCusto }))
 
-  // limite de caracteres do motivo
+  // motivo virou select de categoria + detalhe livre só quando "Outro" —
+  // escolhe "Outro" primeiro pra abrir o campo de detalhe
+  const categoriaSelecionada = await page.evaluate(() => {
+    const linhas = Array.from(document.querySelectorAll('tbody tr'))
+    const linha = linhas.find(tr => tr.innerText.includes('LUVA CIRÚRGICA'))
+    const select = linha?.querySelector('select')
+    if (!select) return false
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set
+    setter.call(select, 'Outro')
+    select.dispatchEvent(new Event('input', { bubbles: true }))
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  })
+  H.check('select de categoria do motivo existe e aceita "Outro"', categoriaSelecionada === true)
+  await new Promise(r2 => setTimeout(r2, 400))
+
+  // limite de caracteres do detalhe: 500 no total gravado menos o prefixo
+  // "Outro: " (7 chars) que entra na frente na hora de salvar
   const limite = await page.evaluate(() => {
     const linhas = Array.from(document.querySelectorAll('tbody tr'))
     const linha = linhas.find(tr => tr.innerText.includes('LUVA CIRÚRGICA'))
-    const input = linha?.querySelector('input[placeholder*="Motivo"]')
+    const input = linha?.querySelector('input[placeholder*="Detalhar"]')
     return input ? input.maxLength : null
   })
-  H.check('campo de motivo tem limite de 500 caracteres', limite === 500, `maxLength: ${limite}`)
+  H.check('campo de detalhe tem limite de 493 caracteres (500 - "Outro: ")', limite === 493, `maxLength: ${limite}`)
 
   const textoLongo = 'A'.repeat(600)
   await page.evaluate((txt) => {
     const linhas = Array.from(document.querySelectorAll('tbody tr'))
     const linha = linhas.find(tr => tr.innerText.includes('LUVA CIRÚRGICA'))
-    const input = linha?.querySelector('input[placeholder*="Motivo"]')
+    const input = linha?.querySelector('input[placeholder*="Detalhar"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
     setter.call(input, txt)
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -119,7 +136,8 @@ async function main() {
   await clicarNaLinha(page, 'LUVA CIRÚRGICA', 'OK')
   await new Promise(r2 => setTimeout(r2, 1500))
   it = await itemId('LUVA CIRÚRGICA')
-  H.check('motivo é truncado em 500 caracteres antes de gravar', it?.motivoDesclassificacao?.length === 500, `tamanho: ${it?.motivoDesclassificacao?.length}`)
+  H.check('motivo (categoria + detalhe) é truncado em 500 caracteres antes de gravar', it?.motivoDesclassificacao?.length === 500, `tamanho: ${it?.motivoDesclassificacao?.length}`)
+  H.check('motivo gravado começa com o prefixo da categoria "Outro: "', it?.motivoDesclassificacao?.startsWith('Outro: '), it?.motivoDesclassificacao?.slice(0, 20))
   H.check('gravar motivo NÃO apaga os números do item', Number(it?.quantidade) === 1000, `quantidade: ${it?.quantidade}`)
 
   await irParaDetalhe(page)
@@ -214,7 +232,11 @@ async function main() {
   H.check('ação de desclassificar foi auditada', acoes.includes('item_desclassificar'))
   H.check('ação de editar item foi auditada', acoes.includes('item_edit'))
   H.check('ação do Kralen foi auditada', acoes.includes('licitacao_kralen_toggle'))
-  H.check('logs de auditoria registram o usuário', logs.some(l => l.user === 'Vinicius'))
+  // Não compara com um nome fixo: pega o nome de quem está de fato logado
+  // nesta execução, pra a suíte funcionar com qualquer conta de teste.
+  const { data: authUser } = await sb.auth.getUser()
+  const { data: perfil } = await sb.from('profiles').select('name').eq('id', authUser.user.id).maybeSingle()
+  H.check('logs de auditoria registram o usuário', logs.some(l => l.user === perfil?.name), `esperado: ${perfil?.name}`)
 
   const errosReais = erros.filter(e => !e.includes('status of 400'))
   H.check('nenhum erro inesperado de console/página', errosReais.length === 0, JSON.stringify(errosReais.slice(0, 3)))

@@ -113,7 +113,9 @@ export default function RelatorioGanhos() {
         Quantidade: Number(it.quantidade) || 0,
         Custo: Number(it.totalCusto) || 0,
         'Valor Ganho': Number(it.valorGanho) || 0,
-        'Margem %': margemPercentual(Number(it.valorGanho) || 0, Number(it.totalCusto) || 0) ?? '',
+        // `undefined` (não '') pra célula ficar realmente vazia na planilha
+        // em vez de virar texto misturado com número na mesma coluna.
+        'Margem %': margemPercentual(Number(it.valorGanho) || 0, Number(it.totalCusto) || 0) ?? undefined,
         Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
       }))
     )

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import {
   listDocumentosEmpresa, addDocumentoEmpresa, updateDocumentoEmpresa, removeDocumentoEmpresa,
-  diasParaVencer, DocumentoEmpresa,
+  DocumentoEmpresa,
 } from '../utils/documentos'
 import { urlsAssinadas, urlAssinada, baixarAnexo, formatarTamanho, MAX_ANEXO_BYTES } from '../utils/arquivo'
-import { nowInBrasilia } from '../utils/date'
+import { nowInBrasilia, diasParaVencer } from '../utils/date'
+import { confirmarRemocao } from '../utils/confirmar'
 import { DateInputBR } from './DateTimeBR'
 
 const FORM_VAZIO = { tipo: '', numero: '', dataEmissao: '', dataValidade: '', reutilizavel: true, observacao: '' }
@@ -74,6 +75,7 @@ export default function DocumentosEmpresaSection() {
   }
 
   const remover = async (id: string) => {
+    if (!confirmarRemocao('este documento', 'Se ele estiver anexado em alguma licitação, a cópia de lá continua intacta.')) return
     setErro('')
     try {
       const list = await removeDocumentoEmpresa(id)

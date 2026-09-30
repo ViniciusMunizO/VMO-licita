@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { listLicitacoes } from '../utils/licitacoes'
 import { listItems } from '../utils/items'
-import { combineDateTime, formatDateTimeBR } from '../utils/date'
+import { combineDateTime, formatDateTimeBR, nowInBrasilia, splitLegacyDateTime, diasParaVencer } from '../utils/date'
 import { formatMoneyBRL, margemPercentual, formatFixed } from '../utils/format'
-import { listDocumentosEmpresa, diasParaVencer, DocumentoEmpresa } from '../utils/documentos'
+import { situacaoDoItem } from '../utils/itens'
+import { listDocumentosEmpresa, DocumentoEmpresa } from '../utils/documentos'
 
 type Licitacao = {
   codigo: number
@@ -40,6 +41,77 @@ function StatTile({ label, value }: { label: string; value: number | string }) {
     <div className="bg-white p-4 rounded shadow">
       <div className="text-sm text-gray-500">{label}</div>
       <div className="text-3xl font-semibold mt-1" style={{ color: 'var(--color-primary)' }}>{value}</div>
+    </div>
+  )
+}
+
+// Últimos `meses` (incluindo o atual), mais antigo primeiro — mês sem
+// nenhuma licitação decidida ainda aparece na lista, com taxa "-".
+// `hojeISO` vem de `nowInBrasilia().date`: usar `new Date()` local faria o
+// mês virar antes da hora perto da virada, dependendo do fuso do navegador.
+function ultimosMeses(qtd: number, hojeISO: string): { chave: string; label: string }[] {
+  const out: { chave: string; label: string }[] = []
+  const [anoHoje, mesHoje] = hojeISO.split('-').map(Number)
+  for (let i = qtd - 1; i >= 0; i--) {
+    const d = new Date(anoHoje, mesHoje - 1 - i, 1)
+    const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: '2-digit' }).format(d).replace(/\./g, '')
+    out.push({ chave, label })
+  }
+  return out
+}
+
+function EvolucaoMensal({ licitacoes, hoje }: { licitacoes: Licitacao[]; hoje: string }) {
+  const meses = useMemo(() => {
+    const janelas = ultimosMeses(6, hoje)
+    const porChave = new Map<string, { ganhou: number; perdeu: number }>()
+    for (const l of licitacoes) {
+      if (l.status !== 'Ganhou' && l.status !== 'Perdeu') continue
+      const { date } = splitLegacyDateTime(l.dataLicitacao)
+      if (!date) continue
+      const chave = date.slice(0, 7)
+      if (!porChave.has(chave)) porChave.set(chave, { ganhou: 0, perdeu: 0 })
+      const c = porChave.get(chave)!
+      if (l.status === 'Ganhou') c.ganhou++
+      else c.perdeu++
+    }
+    return janelas.map(j => {
+      const c = porChave.get(j.chave) || { ganhou: 0, perdeu: 0 }
+      const total = c.ganhou + c.perdeu
+      const taxa = total > 0 ? (c.ganhou / total) * 100 : null
+      return { ...j, ...c, total, taxa }
+    })
+  }, [licitacoes, hoje])
+
+  const maxTotal = Math.max(1, ...meses.map(m => m.total))
+
+  return (
+    <div className="bg-white p-4 rounded shadow">
+      <h4 className="font-semibold mb-3">Evolução mensal (Ganhou x Perdeu)</h4>
+      {meses.every(m => m.total === 0) ? (
+        <div className="text-sm text-gray-500">Nenhuma licitação decidida nos últimos 6 meses.</div>
+      ) : (
+        <div className="space-y-2">
+          {meses.map(m => (
+            <div key={m.chave}>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-700 capitalize">{m.label}</span>
+                <span className="text-gray-500">
+                  {m.total === 0 ? 'sem dados' : `${m.ganhou}G / ${m.perdeu}P — ${formatFixed(m.taxa!, 0)}%`}
+                </span>
+              </div>
+              <div className="h-2 rounded bg-gray-100 overflow-hidden flex">
+                {m.total > 0 && (
+                  <>
+                    <div className="h-full" style={{ width: `${(m.ganhou / maxTotal) * 100}%`, backgroundColor: '#15803d' }} />
+                    <div className="h-full" style={{ width: `${(m.perdeu / maxTotal) * 100}%`, backgroundColor: 'var(--color-error)' }} />
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -100,13 +172,14 @@ export default function Dashboard() {
         if (!Array.isArray(items)) return
         total += items.length
         for (const it of items) {
-          if (it?.vencedor) {
+          const situacao = situacaoDoItem(l, it)
+          if (situacao === 'Vencedor') {
             vencedores++
             totalGanho += Number(it.valorGanho) || 0
             totalCustoGanho += Number(it.totalCusto) || 0
-          } else if (!l.status) {
+          } else if (situacao === 'Em aberto') {
             // Licitação ainda sem resultado: o mínimo cotado é o valor "em
-            // jogo" nesses itens até sair o resultado.
+            // jogo" nesse item até sair o resultado.
             totalEmAberto += Number(it.valorTotalMinimo) || 0
           }
         }
@@ -121,7 +194,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     let mounted = true
-    const hoje = new Date().toISOString().slice(0, 10)
+    const hoje = nowInBrasilia().date
     listDocumentosEmpresa().then(docs => {
       if (!mounted) return
       const vencendo = docs
@@ -137,6 +210,7 @@ export default function Dashboard() {
 
   const currentYear = new Date().getFullYear()
   const now = Date.now()
+  const hoje = nowInBrasilia().date
 
   // "Em aberto" = ainda sem resultado lançado. Uma licitação já marcada como
   // Ganhou/Perdeu está encerrada e não é nem agenda nem pendência.
@@ -157,8 +231,28 @@ export default function Dashboard() {
       return d !== null && d.getTime() < now
     })
 
-    return { total: licitacoes.length, thisYear, proximas, aguardandoResultado }
+    const ganhou = licitacoes.filter(l => l.status === 'Ganhou').length
+    const perdeu = licitacoes.filter(l => l.status === 'Perdeu').length
+    const decididas = ganhou + perdeu
+    const taxaSucesso = decididas > 0 ? (ganhou / decididas) * 100 : null
+
+    return { total: licitacoes.length, thisYear, proximas, aguardandoResultado, taxaSucesso, decididas }
   }, [licitacoes, currentYear, now])
+
+  // Prazos de recurso/impugnação que vencem nos próximos 10 dias, ou já
+  // vencidos — a licitação só some daqui quando o campo é limpo no
+  // cadastro (não some sozinho por já ter status Ganhou/Perdeu, porque o
+  // prazo pode ter passado antes do resultado sair).
+  const prazosProximos = useMemo(() => {
+    const out: { codigo: number; contratante: string; tipo: string; dias: number }[] = []
+    for (const l of licitacoes) {
+      for (const [campo, tipo] of [['dataLimiteRecurso', 'Recurso'], ['dataLimiteImpugnacao', 'Impugnação']] as const) {
+        const dias = diasParaVencer(l[campo], hoje)
+        if (dias !== null && dias <= 10) out.push({ codigo: l.codigo, contratante: contratanteNome(l), tipo, dias })
+      }
+    }
+    return out.sort((a, b) => a.dias - b.dias)
+  }, [licitacoes, hoje])
 
   const byTipoObjeto = useMemo(() => groupCount(licitacoes, l => l.tipoObjeto), [licitacoes])
   const byTipoDisputa = useMemo(() => groupCount(licitacoes, l => l.tipoDisputa), [licitacoes])
@@ -200,7 +294,7 @@ export default function Dashboard() {
           </div>
           <ul className="space-y-2">
             {documentosVencendo.map(d => {
-              const dias = diasParaVencer(d.dataValidade, new Date().toISOString().slice(0, 10))!
+              const dias = diasParaVencer(d.dataValidade, hoje)!
               return (
                 <li key={d.id} className="flex justify-between items-center gap-3 text-sm border-t pt-2 first:border-t-0 first:pt-0">
                   <span className="text-gray-700">{d.tipo}{d.numero ? ` — ${d.numero}` : ''}</span>
@@ -212,6 +306,32 @@ export default function Dashboard() {
             })}
           </ul>
           <Link to="/empresa" className="text-xs link-primary mt-3 inline-block">Ver documentos da empresa</Link>
+        </div>
+      )}
+
+      {prazosProximos.length > 0 && (
+        <div className="bg-white p-4 rounded shadow mb-6 border-l-4" style={{ borderColor: 'var(--color-error)' }}>
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="font-semibold">Prazos de recurso/impugnação</h4>
+            <span
+              className="text-xs font-semibold text-white px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'var(--color-error)' }}
+            >
+              {prazosProximos.length}
+            </span>
+          </div>
+          <ul className="space-y-2">
+            {prazosProximos.map((p, i) => (
+              <li key={`${p.codigo}-${p.tipo}-${i}`} className="flex justify-between items-center gap-3 text-sm border-t pt-2 first:border-t-0 first:pt-0">
+                <Link to={`/licitacoes/${p.codigo}`} className="link-primary">
+                  {p.tipo} — {p.contratante} <span className="text-gray-500">(código {p.codigo})</span>
+                </Link>
+                <span className="text-xs font-medium flex-shrink-0" style={{ color: p.dias < 0 ? 'var(--color-error)' : '#b45309' }}>
+                  {p.dias < 0 ? `Venceu há ${Math.abs(p.dias)} dia(s)` : p.dias === 0 ? 'Vence hoje' : `Vence em ${p.dias} dia(s)`}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -244,9 +364,18 @@ export default function Dashboard() {
             <StatTile label="Em jogo (aguardando resultado)" value={formatMoneyBRL(financeiro.totalEmAberto)} />
           </div>
 
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <StatTile label="Taxa de sucesso" value={stats.taxaSucesso === null ? '-' : `${formatFixed(stats.taxaSucesso, 0)}%`} />
+            <StatTile label="Licitações decididas" value={stats.decididas} />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <BarList title="Por tipo de objeto" data={byTipoObjeto} />
             <BarList title="Por tipo de disputa" data={byTipoDisputa} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 mb-6">
+            <EvolucaoMensal licitacoes={licitacoes} hoje={hoje} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

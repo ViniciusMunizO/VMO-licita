@@ -106,7 +106,7 @@ function lerPlanilha(f: File): Promise<any[][]> {
         const workbook = XLSX.read(e.target?.result, { type: 'binary' })
         const sheet = workbook.Sheets[workbook.SheetNames[0]]
         resolve(XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }))
-      } catch (err) {
+      } catch {
         reject(new Error('Arquivo inválido ou corrompido — não consegui abrir como planilha.'))
       }
     }
@@ -153,7 +153,7 @@ export default function ItemsImportModal({ open, onClose, codigo }: { open: bool
       try {
         const user = localStorage.getItem('user_name') || undefined
         await auditLog('items_import', { codigo, arquivo: f.name, quantidade: saved.length }, user)
-      } catch (err) { /* ignore */ }
+      } catch { /* ignore */ }
     } catch (err: any) {
       // Importar é a operação mais destrutiva do sistema (troca a lista
       // inteira de itens): falhar calado deixava o usuário achando que tinha

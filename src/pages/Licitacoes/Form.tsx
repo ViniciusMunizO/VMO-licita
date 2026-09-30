@@ -41,6 +41,7 @@ export default function FormLicitacao() {
   const nav = useNavigate()
   const location = useLocation()
   const [modelo, setModelo] = useState<Licitacao>({ codigo: 0, ano: new Date().getFullYear() })
+  const [isEditing, setIsEditing] = useState(false)
   const [selectedContratante, setSelectedContratante] = useState<any>(null)
   const [contratanteFocused, setContratanteFocused] = useState(false)
   const [showAttachmentsModal, setShowAttachmentsModal] = useState(false)
@@ -73,7 +74,7 @@ export default function FormLicitacao() {
       try {
         const cs = await listContratantes()
         if (mounted) setContratantes(cs)
-      } catch (err) { /* ignore */ }
+      } catch { /* ignore */ }
       if (!mounted) return
       if (edit) {
         const found = await getLicitacao(edit)
@@ -93,8 +94,6 @@ export default function FormLicitacao() {
     return () => { mounted = false }
   }, [])
 
-  const [isEditing, setIsEditing] = useState(false)
-
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     setErroSalvar('')
@@ -112,7 +111,7 @@ export default function FormLicitacao() {
       try {
         const userName = localStorage.getItem('user_name') || undefined
         await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: saved.codigo }, userName)
-      } catch (err) { /* auditoria nunca trava o salvamento */ }
+      } catch { /* auditoria nunca trava o salvamento */ }
       nav('/licitacoes')
     } catch (err: any) {
       setErroSalvar(err?.message || 'Não foi possível salvar a licitação.')
@@ -270,6 +269,21 @@ export default function FormLicitacao() {
         </div>
 
         <div className="mt-2 bg-white border rounded p-4">
+          <h4 className="font-semibold mb-1">Prazos</h4>
+          <p className="text-sm text-gray-500 mb-3">Deixe em branco quando não se aplicar. Preenchidos, aparecem no alerta de prazos do Dashboard.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-600">Data-limite pra Recurso</label>
+              <DateInputBR value={(modelo as any).dataLimiteRecurso || ''} onChange={v => setModelo({ ...modelo, dataLimiteRecurso: v })} className="w-full p-2 rounded" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600">Data-limite pra Impugnação</label>
+              <DateInputBR value={(modelo as any).dataLimiteImpugnacao || ''} onChange={v => setModelo({ ...modelo, dataLimiteImpugnacao: v })} className="w-full p-2 rounded" />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-2 bg-white border rounded p-4">
           <h4 className="font-semibold mb-3">Proposta</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -344,7 +358,7 @@ export default function FormLicitacao() {
         try {
           const cs = await listContratantes()
           setContratantes(cs)
-        } catch (err) { /* ignore */ }
+        } catch { /* ignore */ }
       }} onSelect={(c) => { setSelectedContratante(c); setModelo(m => ({ ...m, contratado: c.nome })) }} />
     </div>
   )

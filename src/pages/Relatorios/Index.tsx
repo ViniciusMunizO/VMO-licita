@@ -4,8 +4,9 @@ import RelatorioItensPerdidos from './ItensPerdidos'
 import RelatorioItensDesclassificados from './ItensDesclassificados'
 import RelatorioStatusLicitacoes from './StatusLicitacoes'
 import RelatorioHistoricoItem from './HistoricoItem'
+import RelatorioRankingContratantes from './RankingContratantes'
 
-type TipoRelatorio = 'status' | 'ganhos' | 'itensPerdidos' | 'desclassificadas' | 'historicoItem'
+type TipoRelatorio = 'status' | 'ganhos' | 'itensPerdidos' | 'desclassificadas' | 'historicoItem' | 'rankingContratantes'
 
 const TIPOS: { id: TipoRelatorio; label: string; disponivel: boolean }[] = [
   { id: 'status', label: 'Status das Licitações', disponivel: true },
@@ -13,6 +14,7 @@ const TIPOS: { id: TipoRelatorio; label: string; disponivel: boolean }[] = [
   { id: 'itensPerdidos', label: 'Itens Perdidos', disponivel: true },
   { id: 'desclassificadas', label: 'Itens Desclassificados', disponivel: true },
   { id: 'historicoItem', label: 'Histórico de Item', disponivel: true },
+  { id: 'rankingContratantes', label: 'Ranking de Contratantes', disponivel: true },
 ]
 
 export default function RelatoriosIndex() {
@@ -47,6 +49,7 @@ export default function RelatoriosIndex() {
       {tipo === 'itensPerdidos' && <RelatorioItensPerdidos />}
       {tipo === 'desclassificadas' && <RelatorioItensDesclassificados />}
       {tipo === 'historicoItem' && <RelatorioHistoricoItem />}
+      {tipo === 'rankingContratantes' && <RelatorioRankingContratantes />}
     </div>
   )
 }

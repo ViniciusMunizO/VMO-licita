@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../utils/supabaseClient'
 import Logo from '../components/Logo'
 
 const DESTAQUES = [
@@ -18,8 +19,36 @@ export default function Login() {
   const [lembrar, setLembrar] = useState(() => !!localStorage.getItem(EMAIL_LEMBRADO_KEY))
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [modoRecuperar, setModoRecuperar] = useState(false)
+  const [recuperarEmail, setRecuperarEmail] = useState('')
+  const [recuperarEnviado, setRecuperarEnviado] = useState(false)
+  const [recuperarErro, setRecuperarErro] = useState('')
+  const [recuperarEnviando, setRecuperarEnviando] = useState(false)
   const { login } = useAuth()
   const nav = useNavigate()
+
+  const enviarRecuperacao = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setRecuperarErro('')
+    setRecuperarEnviando(true)
+    try {
+      // BASE_URL entra aqui porque o app pode ser servido num subcaminho
+      // (ver vite.config.ts) — sem isso, o link do e-mail cairia fora da
+      // rota da SPA nesse tipo de deploy.
+      const { error: err } = await supabase.auth.resetPasswordForEmail(recuperarEmail, {
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}redefinir-senha`,
+      })
+      if (err) throw err
+      setRecuperarEnviado(true)
+    } catch {
+      // Mensagem genérica de propósito: não confirmar/negar se o e-mail
+      // existe evita que alguém use este formulário pra descobrir quem tem
+      // conta no sistema.
+      setRecuperarErro('Não consegui enviar o e-mail agora. Tente de novo em alguns minutos.')
+    } finally {
+      setRecuperarEnviando(false)
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,6 +110,55 @@ export default function Login() {
             <Logo size="md" />
           </div>
 
+          {modoRecuperar ? (
+            recuperarEnviado ? (
+              <>
+                <h1 className="text-2xl font-semibold text-gray-900 mb-1">Verifique seu e-mail</h1>
+                <p className="text-sm text-gray-500 mb-8">
+                  Se <strong>{recuperarEmail}</strong> tiver uma conta no sistema, um link pra redefinir a senha foi enviado pra essa caixa de entrada.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setModoRecuperar(false); setRecuperarEnviado(false) }}
+                  className="btn btn-ghost w-full justify-center py-2.5 text-sm font-medium"
+                >
+                  Voltar pro login
+                </button>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-semibold text-gray-900 mb-1">Esqueci minha senha</h1>
+                <p className="text-sm text-gray-500 mb-8">Informe seu e-mail — se tiver conta, mandamos um link pra você definir uma senha nova.</p>
+                <form onSubmit={enviarRecuperacao} className="space-y-4">
+                  <div>
+                    <label htmlFor="emailRecuperar" className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+                    <input
+                      id="emailRecuperar"
+                      type="email"
+                      value={recuperarEmail}
+                      onChange={e => setRecuperarEmail(e.target.value)}
+                      autoFocus
+                      autoComplete="username"
+                      className="w-full p-2.5 rounded-lg bg-white"
+                      placeholder="seu.email@empresa.com"
+                    />
+                  </div>
+                  {recuperarErro && (
+                    <div className="text-sm px-3 py-2 rounded-lg border-l-4" style={{ backgroundColor: '#fef2f2', borderColor: 'var(--color-error)', color: '#b91c1c' }}>
+                      {recuperarErro}
+                    </div>
+                  )}
+                  <button type="submit" disabled={recuperarEnviando} className="btn btn-primary w-full justify-center py-2.5 text-sm font-medium disabled:opacity-60">
+                    {recuperarEnviando ? 'Enviando...' : 'Enviar link de redefinição'}
+                  </button>
+                  <button type="button" onClick={() => setModoRecuperar(false)} className="btn btn-ghost w-full justify-center py-2.5 text-sm font-medium">
+                    Voltar pro login
+                  </button>
+                </form>
+              </>
+            )
+          ) : (
+          <>
           <h1 className="text-2xl font-semibold text-gray-900 mb-1">Entrar</h1>
           <p className="text-sm text-gray-500 mb-8">Use seu e-mail e senha pra acessar o sistema.</p>
 
@@ -121,14 +199,23 @@ export default function Login() {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
-              <input
-                type="checkbox"
-                checked={lembrar}
-                onChange={e => setLembrar(e.target.checked)}
-              />
-              Lembrar meu e-mail
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
+                <input
+                  type="checkbox"
+                  checked={lembrar}
+                  onChange={e => setLembrar(e.target.checked)}
+                />
+                Lembrar meu e-mail
+              </label>
+              <button
+                type="button"
+                onClick={() => { setModoRecuperar(true); setRecuperarEmail(email) }}
+                className="text-sm link-primary"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
 
             {error && (
               <div className="text-sm px-3 py-2 rounded-lg border-l-4" style={{ backgroundColor: '#fef2f2', borderColor: 'var(--color-error)', color: '#b91c1c' }}>
@@ -140,6 +227,8 @@ export default function Login() {
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
+          </>
+          )}
         </div>
       </div>
     </div>

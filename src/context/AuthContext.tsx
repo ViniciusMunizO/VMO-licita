@@ -15,6 +15,12 @@ type AuthContextValue = {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  // true a partir do momento em que o link de "esqueci minha senha" é aberto
+  // (o Supabase autentica a sessão nesse instante) até a senha nova ser
+  // definida — usado pelo App pra travar a tela em "Definir nova senha" em
+  // vez de deixar entrar direto no sistema com esse login temporário.
+  passwordRecovery: boolean
+  concluirRedefinicaoSenha: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -22,6 +28,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
 
   // Restaura a sessão ao carregar a página (o Supabase já persiste o token
   // sozinho) e escuta troca/expiração de sessão em outras abas.
@@ -44,7 +51,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       carregarDeSessao(data.session).finally(() => { if (mounted) setLoading(false) })
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // O Supabase autentica a sessão assim que o link do e-mail é aberto —
+      // sem essa marca, quem clica no link entraria direto no sistema com
+      // esse login temporário em vez de ser obrigado a definir a senha nova.
+      // A tela de redefinição não usa `user`, então não vale a pena buscar o
+      // perfil agora — o próximo evento (depois da senha trocada) já cuida disso.
+      if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); return }
       carregarDeSessao(session)
     })
 
@@ -63,9 +76,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     supabase.auth.signOut()
     setUser(null)
+    setPasswordRecovery(false)
   }
 
-  return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
+  const concluirRedefinicaoSenha = () => setPasswordRecovery(false)
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout, passwordRecovery, concluirRedefinicaoSenha }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export const useAuth = () => {

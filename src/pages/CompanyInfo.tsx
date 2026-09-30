@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { getEmpresaInfo, saveEmpresaInfo } from '../utils/empresa'
 import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
+import { confirmarRemocao } from '../utils/confirmar'
 import DocumentosEmpresaSection from '../components/DocumentosEmpresaSection'
 
 type BancoConta = {
@@ -196,7 +197,10 @@ export default function CompanyInfo() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, bancos: f.bancos.filter((_, i) => i !== idx) }))}
+                      onClick={() => {
+                        if (!confirmarRemocao('esta conta bancária', 'A remoção só vale depois de clicar em Salvar.')) return
+                        setForm(f => ({ ...f, bancos: f.bancos.filter((_, i) => i !== idx) }))
+                      }}
                       className="btn btn-ghost text-sm"
                       style={{ color: 'var(--color-error)' }}
                       title="Remover conta"

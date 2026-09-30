@@ -10,8 +10,12 @@ type Contratante = {
 export default function ContractorModal({ open, onClose, onSelect }: { open: boolean; onClose: () => void; onSelect: (c: Contratante) => void }) {
   const [list, setList] = useState<Contratante[]>([])
   const [form, setForm] = useState<Partial<Contratante>>({ nome: '', uf: '' })
+  const [erro, setErro] = useState('')
+  const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
+    if (!open) return
+    setErro('')
     let mounted = true
     listContratantes().then(raw => { if (mounted) setList(raw || []) })
     return () => { mounted = false }
@@ -19,9 +23,17 @@ export default function ContractorModal({ open, onClose, onSelect }: { open: boo
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
-    const updated = await addContratante(form.nome || '', form.uf || '')
-    setList(updated)
-    setForm({ nome: '', uf: '' })
+    setErro('')
+    setSalvando(true)
+    try {
+      const updated = await addContratante(form.nome || '', form.uf || '')
+      setList(updated)
+      setForm({ nome: '', uf: '' })
+    } catch (err: any) {
+      setErro(err?.message || 'Não consegui cadastrar o contratante. Tente de novo.')
+    } finally {
+      setSalvando(false)
+    }
   }
 
   if (!open) return null
@@ -40,8 +52,9 @@ export default function ContractorModal({ open, onClose, onSelect }: { open: boo
             <form onSubmit={save} className="space-y-2">
               <input placeholder="Nome do Município" value={form.nome || ''} onChange={e => setForm({ ...form, nome: e.target.value })} className="w-full p-2 rounded" required />
               <input placeholder="UF" value={form.uf || ''} onChange={e => setForm({ ...form, uf: e.target.value.toUpperCase() })} className="w-full p-2 rounded" maxLength={2} required />
+              {erro && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{erro}</p>}
               <div className="flex gap-2">
-                <button className="btn btn-primary">Salvar</button>
+                <button className="btn btn-primary disabled:opacity-50" disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
           </div>

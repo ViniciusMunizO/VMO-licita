@@ -3,15 +3,24 @@ import { Link } from 'react-router-dom'
 import { listLicitacoes } from '../../utils/licitacoes'
 import { listItems } from '../../utils/items'
 import { listAtas } from '../../utils/atas'
-import { formatDateTimeBR } from '../../utils/date'
+import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
+import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
+import { DateInputBR } from '../../components/DateTimeBR'
+import StatusBadge from '../../components/StatusBadge'
+
+const FILTROS_VAZIOS = { codigo: '', contratante: '', numeroPregao: '', numeroProcesso: '', portal: '', tipoObjeto: '', tipoDisputa: '', status: '', hasAta: 'any', q: '' }
 
 export default function ListLicitacoes() {
   const [list, setList] = useState<any[]>([])
   const [hasAtaByCodigo, setHasAtaByCodigo] = useState<Record<string, boolean>>({})
   const [itemsTextByCodigo, setItemsTextByCodigo] = useState<Record<string, string>>({})
   const [listOptions, setListOptions] = useState<any>({ page: 1, pageSize: 10, sortBy: 'codigo', sortDir: 'desc' })
-  const [filters, setFilters] = useState<any>({ codigo: '', contratante: '', numeroPregao: '', numeroProcesso: '', tipoObjeto: '', tipoDisputa: '', hasAta: 'any', q: '' })
+  const [filters, setFilters] = useState<any>(FILTROS_VAZIOS)
   const [searchTerm, setSearchTerm] = useState('')
+  const [periodo, setPeriodo] = useState<Periodo>('todos')
+  const [dataInicioCustom, setDataInicioCustom] = useState('')
+  const [dataFimCustom, setDataFimCustom] = useState('')
+  const hoje = nowInBrasilia().date
 
   useEffect(() => {
     let mounted = true
@@ -44,8 +53,11 @@ export default function ListLicitacoes() {
   }, [searchTerm])
 
   const clearFilters = () => {
-    setFilters({ codigo: '', contratante: '', numeroPregao: '', numeroProcesso: '', tipoObjeto: '', tipoDisputa: '', hasAta: 'any', q: '' })
+    setFilters(FILTROS_VAZIOS)
     setSearchTerm('')
+    setPeriodo('todos')
+    setDataInicioCustom('')
+    setDataFimCustom('')
     setListOptions((o: any) => ({ ...o, page: 1 }))
   }
 
@@ -60,13 +72,18 @@ export default function ListLicitacoes() {
     }
     if (filters.numeroPregao && !(String(l.numeroPregao || '').toLowerCase().includes(String(filters.numeroPregao).toLowerCase()))) return false
     if (filters.numeroProcesso && !(String(l.numeroProcesso || '').toLowerCase().includes(String(filters.numeroProcesso).toLowerCase()))) return false
+    if (filters.portal && !(String(l.portal || '').toLowerCase().includes(String(filters.portal).toLowerCase()))) return false
     if (filters.tipoObjeto && filters.tipoObjeto !== '' && (l.tipoObjeto || '') !== filters.tipoObjeto) return false
     if (filters.tipoDisputa && filters.tipoDisputa !== '' && (l.tipoDisputa || '') !== filters.tipoDisputa) return false
+    if (filters.status) {
+      if (filters.status === 'semStatus' ? !!l.status : l.status !== filters.status) return false
+    }
     if (filters.hasAta !== 'any') {
       const has = !!hasAtaByCodigo[String(l.codigo)]
       if (filters.hasAta === 'yes' && !has) return false
       if (filters.hasAta === 'no' && has) return false
     }
+    if (!dataDentroDoPeriodo(l.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom)) return false
     if (filters.q) {
       const hay = (JSON.stringify(l) + ' ' + (itemsTextByCodigo[String(l.codigo)] || '')).toLowerCase()
       if (!hay.includes(String(filters.q).toLowerCase())) return false
@@ -105,6 +122,7 @@ export default function ListLicitacoes() {
           <input placeholder="Contratante" value={filters.contratante} onChange={e => setFilters({ ...filters, contratante: e.target.value })} className="p-2 rounded" />
           <input placeholder="Número do Pregão" value={filters.numeroPregao} onChange={e => setFilters({ ...filters, numeroPregao: e.target.value })} className="p-2 rounded" />
           <input placeholder="Número do Processo" value={filters.numeroProcesso} onChange={e => setFilters({ ...filters, numeroProcesso: e.target.value })} className="p-2 rounded" />
+          <input placeholder="Portal" value={filters.portal} onChange={e => setFilters({ ...filters, portal: e.target.value })} className="p-2 rounded" />
           <select value={filters.tipoObjeto} onChange={e => setFilters({ ...filters, tipoObjeto: e.target.value })} className="p-2 rounded">
             <option value="">Tipo Objeto (qualquer)</option>
             <option>Medicamentos</option>
@@ -118,15 +136,43 @@ export default function ListLicitacoes() {
             <option>Aberto-Fechado</option>
             <option>Fechado-Aberto</option>
           </select>
+          <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })} className="p-2 rounded">
+            <option value="">Status (qualquer)</option>
+            <option value="Ganhou">Ganhou</option>
+            <option value="Perdeu">Perdeu</option>
+            <option value="semStatus">Sem status</option>
+          </select>
           <select value={filters.hasAta} onChange={e => setFilters({ ...filters, hasAta: e.target.value })} className="p-2 rounded">
             <option value="any">Tem ata?</option>
             <option value="yes">Sim</option>
             <option value="no">Não</option>
           </select>
           <input placeholder="Busca geral (itens/observações)" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 rounded sm:col-span-2" />
-          <div className="flex gap-2">
-            <button type="button" onClick={clearFilters} className="btn btn-ghost">Limpar</button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <span className="text-sm text-gray-600">Período:</span>
+          <div className="flex flex-wrap gap-2">
+            {PERIODOS.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPeriodo(p.id)}
+                className={periodo === p.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
+          {periodo === 'custom' && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-600">De</span>
+              <DateInputBR value={dataInicioCustom} onChange={setDataInicioCustom} className="p-1.5 rounded w-32" />
+              <span className="text-gray-600">até</span>
+              <DateInputBR value={dataFimCustom} onChange={setDataFimCustom} className="p-1.5 rounded w-32" />
+            </div>
+          )}
+          <button type="button" onClick={clearFilters} className="btn btn-ghost text-sm">Limpar filtros</button>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -173,12 +219,7 @@ export default function ListLicitacoes() {
                   <td className="p-2">{l.contratante?.nome || l.contratado || l.empresa?.razaoSocial || '-'}</td>
                   <td className="p-2">{formatDateTimeBR(l.dataLicitacao, l.horaLicitacao)}</td>
                   <td className="p-2">
-                    <span className={
-                      l.status === 'Ganhou' ? 'text-green-600 font-medium'
-                        : l.status === 'Perdeu' ? 'font-medium' : 'text-gray-500'
-                    } style={l.status === 'Perdeu' ? { color: 'var(--color-error)' } : undefined}>
-                      {l.status || 'Sem status'}
-                    </span>
+                    <StatusBadge status={l.status} />
                   </td>
                   <td className="p-2">
                       <Link to={`/licitacoes/${l.codigo}`} className="btn btn-primary text-xs px-3 py-1">Ver Licitação</Link>
