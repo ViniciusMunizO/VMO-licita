@@ -53,6 +53,7 @@ defasagem silenciosa.
 | `0010_metas.sql` | Cria `metas` (valor e taxa de sucesso alvo por mês), comparada com o realizado no card "Meta do mês" do Dashboard. Só admin define, qualquer membro ativo lê. |
 | `0011_entregas.sql` | Cria `entregas` (quantidade/data/nota fiscal por remessa entregue de um item vencedor), pra comparar entregue x contratado na tela de detalhe. Escopo menor do que "alerta de capacidade" — isso ficou de fora, precisaria de catálogo de produtos/estoque à parte. |
 | `0012_audit_logs_retencao_minima.sql` | **Corrige falha de segurança da 0008**: a policy de delete deixava admin apagar qualquer log, inclusive recém-criado. Agora só deixa apagar log com mais de 180 dias, reforçado no banco. Rode mesmo se já rodou a 0008. |
+| `0013_metas_delete.sql` | Adiciona a policy de delete que faltava em `metas` (admin ativo) — sem ela, nem admin conseguia apagar uma meta, só zerar os valores. Achado pela própria suíte de teste. |
 
 ## Nota sobre o `0001_cotacao.sql`
 

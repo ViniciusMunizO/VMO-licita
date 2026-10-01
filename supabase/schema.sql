@@ -456,6 +456,10 @@ create policy "admin atualiza metas" on metas for update using (
 ) with check (
   exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
 );
+drop policy if exists "admin apaga metas" on metas;
+create policy "admin apaga metas" on metas for delete using (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin' and p.ativo = true)
+);
 
 -- audit_logs é só "for insert" + "for select restrito a admin ativo" de
 -- propósito (nunca "for all"): o app só precisa gravar e o admin ler — se

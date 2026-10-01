@@ -135,6 +135,29 @@ async function main() {
   t = await H.texto(page)
   H.check('com data no passado distante, nenhum log é apagado', t.includes('Nenhum log anterior a essa data'))
 
+  H.secao('52. Histórico de preço ao editar item')
+  const codKralenTeste = `HIST-TESTE-${CODIGO}`
+  await sb.from('items').update({ codKralen: codKralenTeste, vencedor: true, valorGanho: '888.50' }).eq('id', itemAlvo.id)
+
+  const { data: novaLicHist } = await sb.from('licitacoes').insert({ ano: 2026, contratado: 'TESTE CASCADE', numeroPregao: 'TESTE-E2E-HIST', status: 'Perdeu' }).select().single()
+  await sb.from('items').insert({ licitacaoCodigo: novaLicHist.codigo, descricao: 'ITEM HISTORICO TESTE', codKralen: codKralenTeste, quantidade: 10, vencedor: false })
+
+  await page.goto(`${H.BASE}/licitacoes/${novaLicHist.codigo}`, { waitUntil: 'networkidle0' })
+  await new Promise(r => setTimeout(r, 1600))
+  const abriuItem = await page.evaluate(() => {
+    const row = Array.from(document.querySelectorAll('tbody tr')).find(tr => tr.textContent.includes('ITEM HISTORICO TESTE'))
+    if (row) { row.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true }
+    return false
+  })
+  H.check('consegue clicar no item pra editar', abriuItem === true)
+  await new Promise(r => setTimeout(r, 1200))
+  t = await H.texto(page)
+  H.check('mostra o histórico de outra licitação com o mesmo Cód. Kralen',
+    t.includes('1 vitória(s) em 1 disputa(s)'), t.slice(0, 1500))
+  H.check('mostra o último valor ganho do histórico', t.includes('último valor ganho: R$ 888,50'))
+
+  await sb.from('licitacoes').delete().eq('codigo', novaLicHist.codigo)
+
   const errosReais = erros.filter(e => !e.includes('status of 400'))
   H.check('nenhum erro inesperado de console/página', errosReais.length === 0, JSON.stringify(errosReais.slice(0, 5)))
 

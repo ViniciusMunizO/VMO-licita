@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { formatDateTimeBR, formatDateBR, formatEpochBR } from '../../utils/date'
-import { formatNumeric, calcTotalCusto, calcValorUnitMinimo, calcValorTotalMinimo, calcValorTotalMunicipio } from '../../utils/format'
+import { formatNumeric, calcTotalCusto, calcValorUnitMinimo, calcValorTotalMinimo, calcValorTotalMunicipio, formatMoneyBRL, formatFixed } from '../../utils/format'
 import AttachmentsModal from '../../components/AttachmentsModal'
 import AtaContratoModal, { Ata } from '../../components/AtaContratoModal'
 import DeclaracoesSection from '../../components/DeclaracoesSection'
@@ -12,7 +12,7 @@ import PrintableChecklist from '../../components/PrintableChecklist'
 import PrintableProposta from '../../components/PrintableProposta'
 import { setLancadoNoKralen } from '../../utils/kralen'
 import { getLicitacao, updateLicitacao } from '../../utils/licitacoes'
-import { listItems, updateItem } from '../../utils/items'
+import { listItems, updateItem, buscarHistoricoPrecoItem, HistoricoPrecoItem } from '../../utils/items'
 import { MOTIVOS_DESCLASSIFICACAO, PREFIXO_OUTRO, parseMotivo, formatMotivo } from '../../utils/itens'
 import { listAttachments, getAttachmentData } from '../../utils/attachments'
 import { uploadAnexo, removerDoStorage, urlAssinada } from '../../utils/arquivo'
@@ -278,8 +278,22 @@ export default function DetailLicitacao() {
     if (found) setModel(found)
   }
 
+  // Ganhou/Perdeu muda com frequência (assim que sai o resultado) e não devia
+  // exigir entrar no formulário de edição inteiro só por isso — igual ao
+  // Kralen, troca na hora direto na tela de detalhe.
+  const alterarStatus = async (novoStatus: string) => {
+    const atualizado = await updateLicitacao(model.codigo, { status: novoStatus || null })
+    setModel(atualizado)
+    try {
+      const userName = localStorage.getItem('user_name') || undefined
+      await auditLog('licitacao_status', { codigo: model.codigo, status: novoStatus || null }, userName)
+    } catch { /* ignore */ }
+  }
+
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null)
   const [editItemDraft, setEditItemDraft] = useState<any>(null)
+  const [historicoPreco, setHistoricoPreco] = useState<HistoricoPrecoItem | null>(null)
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false)
   const [valorGanhoDraft, setValorGanhoDraft] = useState<Record<number, string>>({})
   const [editingValorGanhoIdx, setEditingValorGanhoIdx] = useState<number | null>(null)
 
@@ -336,11 +350,18 @@ export default function DetailLicitacao() {
   const startEditItem = (idx: number) => {
     setEditingItemIndex(idx)
     setEditItemDraft({ ...items[idx] })
+    setHistoricoPreco(null)
+    setCarregandoHistorico(true)
+    buscarHistoricoPrecoItem({ codKralen: items[idx].codKralen, descricao: items[idx].descricao, idExcluir: items[idx].id })
+      .then(setHistoricoPreco)
+      .catch(() => setHistoricoPreco(null))
+      .finally(() => setCarregandoHistorico(false))
   }
 
   const cancelEditItem = () => {
     setEditingItemIndex(null)
     setEditItemDraft(null)
+    setHistoricoPreco(null)
   }
 
   const saveEditItem = async (idx: number) => {
@@ -372,6 +393,19 @@ export default function DetailLicitacao() {
         <h3 className="text-lg sm:text-xl font-semibold flex flex-wrap items-center gap-x-3 gap-y-2">
           Licitação {model.codigo} — {model.ano}
           <StatusBadge status={model.status} />
+          <label className="flex items-center gap-1.5 text-sm font-normal text-gray-600">
+            Status:
+            <select
+              aria-label="Status da licitação"
+              value={model.status || ''}
+              onChange={e => alterarStatus(e.target.value)}
+              className="p-1 rounded text-sm font-normal"
+            >
+              <option value="">(sem status)</option>
+              <option value="Ganhou">Ganhou</option>
+              <option value="Perdeu">Perdeu</option>
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-sm font-normal text-gray-600">
             <input type="checkbox" checked={!!model.lancadoNoKralen} onChange={e => toggleKralen(e.target.checked)} />
             Lançada no Kralen
@@ -390,7 +424,7 @@ export default function DetailLicitacao() {
         </div>
       )}
 
-      <div className="mt-4">
+      <div className="mt-4 bg-white border rounded p-4">
         <h4 className="font-semibold mb-2">Atas / Contratos</h4>
         {atas.length === 0 ? (
           <div className="text-sm text-gray-500">Nenhuma ata/contrato cadastrado ainda.</div>
@@ -430,7 +464,8 @@ export default function DetailLicitacao() {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mt-4 bg-white border rounded p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <strong>Contratante</strong>
           <div className="mt-1">{model.contratante?.nome || model.contratado || model.empresa?.razaoSocial || '-'}</div>
@@ -465,8 +500,9 @@ export default function DetailLicitacao() {
         <strong>Objeto Licitação</strong>
         <div className="mt-1 whitespace-pre-wrap">{model.objetoLicitacao || '-'}</div>
       </div>
+      </div>
 
-      <div className="mt-6">
+      <div className="mt-6 bg-white border rounded p-4">
         <h4 className="font-semibold">Habilitação (Checklist)</h4>
         {model.habilitacao ? (
           <>
@@ -499,7 +535,7 @@ export default function DetailLicitacao() {
         ) : <div className="text-sm text-gray-500 mt-2">Sem dados de habilitação</div>}
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 bg-white border rounded p-4">
         <h4 className="font-semibold">Proposta</h4>
         <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
@@ -529,7 +565,7 @@ export default function DetailLicitacao() {
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 bg-white border rounded p-4">
         <h4 className="font-semibold">Itens</h4>
         {items.length === 0 ? (
           <div className="text-sm text-gray-500 mt-2">Nenhum item importado</div>
@@ -735,6 +771,19 @@ export default function DetailLicitacao() {
                       {isEditing && (
                         <tr className="bg-cyan-50/40 border-t">
                           <td colSpan={hasLotes ? 17 : 16} className="p-4" onClick={e => e.stopPropagation()}>
+                            {carregandoHistorico ? (
+                              <div className="text-xs text-gray-500 mb-3">Buscando histórico deste item em outras licitações...</div>
+                            ) : historicoPreco ? (
+                              <div className="text-xs text-gray-700 mb-3 bg-white border rounded px-3 py-2 inline-block">
+                                <strong>Histórico deste item:</strong>{' '}
+                                {historicoPreco.vitorias} vitória(s) em {historicoPreco.ocorrencias} disputa(s) anterior(es)
+                                {historicoPreco.taxaVitoria !== null && ` (${formatFixed(historicoPreco.taxaVitoria, 0)}%)`}
+                                {historicoPreco.ultimoValorGanho !== null && ` — último valor ganho: ${formatMoneyBRL(historicoPreco.ultimoValorGanho)}`}
+                                {historicoPreco.mediaValorUnitMinimo !== null && ` — custo mínimo médio cotado: ${formatMoneyBRL(historicoPreco.mediaValorUnitMinimo)}`}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400 mb-3">Sem histórico de cotações anteriores pra este item.</div>
+                            )}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                               {ITEM_FIELDS.map(f => (
                                 <div key={f.key} className={f.wide ? 'sm:col-span-2' : ''}>
@@ -800,7 +849,7 @@ export default function DetailLicitacao() {
 
       <DeclaracoesSection modelo={model} />
 
-      <div className="mt-6">
+      <div className="mt-6 bg-white border rounded p-4">
         <h4 className="font-semibold">Anexos</h4>
         <div className="mt-2">
           <button onClick={() => setOpenAttachments(true)} className="btn btn-ghost">Gerenciar Anexos</button>

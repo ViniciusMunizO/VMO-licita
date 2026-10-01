@@ -86,7 +86,6 @@ async function main() {
   await preencher('Objeto Licitação', 'Objeto de teste automatizado E2E')
   await preencher('Tipo Objeto', 'Medicamentos')
   await preencher('Tipo de disputa', 'Aberto')
-  await preencher('Status', 'Ganhou')
 
   await H.clicarPorTexto(page, 'Salvar')
   await new Promise(r => setTimeout(r, 2500))
@@ -96,8 +95,9 @@ async function main() {
   H.check('licitação nova foi realmente gravada no banco', criadas && criadas.length === 1, `encontradas: ${criadas?.length}`)
   if (criadas && criadas.length === 1) {
     codigoNovo = criadas[0].codigo
-    H.check('campos gravados corretamente', criadas[0].numeroProcesso === 'PROC-E2E-001' && criadas[0].portal === 'COMPRASNET' && criadas[0].status === 'Ganhou',
-      JSON.stringify({ p: criadas[0].numeroProcesso, portal: criadas[0].portal, s: criadas[0].status }))
+    H.check('campos gravados corretamente', criadas[0].numeroProcesso === 'PROC-E2E-001' && criadas[0].portal === 'COMPRASNET',
+      JSON.stringify({ p: criadas[0].numeroProcesso, portal: criadas[0].portal }))
+    H.check('licitação nasce sem status (Ganhou/Perdeu não é mais campo do formulário)', !criadas[0].status, `status: ${criadas[0].status}`)
     H.check('código gerado pelo banco (identity), não pelo cliente', typeof criadas[0].codigo === 'number' && criadas[0].codigo > 0, `código: ${criadas[0].codigo}`)
     H.check('criadoPor gravado', criadas[0].criadoPor === criadoPor, `valor: ${criadas[0].criadoPor}`)
   }
@@ -130,11 +130,21 @@ async function main() {
     await new Promise(r => setTimeout(r, 1500))
     t = await H.texto(page)
     H.check('detalhe mostra o número do pregão', t.includes('TESTE-E2E-001'))
-    H.check('detalhe mostra o status como badge', t.includes('Ganhou'))
+    H.check('detalhe mostra "Sem status" antes de alterar', t.includes('Sem status'))
     H.check('detalhe mostra a seção de itens', t.includes('Itens'))
     H.check('detalhe mostra "Nenhum item importado" quando não há itens', t.includes('Nenhum item importado'))
     H.check('detalhe mostra as seções de Declarações e Anexos', t.includes('Declarações') && t.includes('Anexos'))
     H.check('detalhe mostra os botões de documento', t.includes('Imprimir Checklist') && t.includes('Emitir Proposta'))
+
+    H.secao('6b. Alterar status direto na tela de detalhe (sem entrar no formulário)')
+    await page.select('select[aria-label="Status da licitação"]', 'Ganhou')
+    await new Promise(r => setTimeout(r, 1200))
+    const { data: comStatus } = await sb.from('licitacoes').select('status').eq('codigo', codigoNovo).single()
+    H.check('alterar o status salva no banco na hora', comStatus?.status === 'Ganhou', `status: ${comStatus?.status}`)
+    t = await H.texto(page)
+    H.check('o badge atualiza pra "Ganhou" sem precisar recarregar', t.includes('Ganhou'))
+    const { data: logStatus } = await sb.from('audit_logs').select('action').order('at', { ascending: false }).limit(1).single()
+    H.check('mudança de status é auditada', logStatus?.action === 'licitacao_status', `ação: ${logStatus?.action}`)
   }
 
   // licitação inexistente

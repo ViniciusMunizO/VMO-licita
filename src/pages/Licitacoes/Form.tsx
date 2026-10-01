@@ -146,15 +146,6 @@ export default function FormLicitacao() {
         </div>
 
         <div>
-          <label htmlFor="f-status" className="block text-sm text-gray-600">Status</label>
-          <select id="f-status" value={(modelo as any).status || ''} onChange={e => setModelo({ ...modelo, status: e.target.value })} className="w-full p-2 rounded">
-            <option value="">(sem status)</option>
-            <option value="Ganhou">Ganhou</option>
-            <option value="Perdeu">Perdeu</option>
-          </select>
-        </div>
-
-        <div>
           <label htmlFor="f-contratante" className="block text-sm text-gray-600">Contratante</label>
           {/* Input e botão lado a lado, não sobrepostos. O botão ficava
               posicionado por cima do campo, e o nome do município digitado

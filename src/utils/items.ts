@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { situacaoDoItem } from './itens'
 
 // Colunas numéricas do banco. Célula vazia vira null (o Postgres rejeita ''),
 // e texto no formato brasileiro é convertido pra número antes de gravar —
@@ -142,6 +143,49 @@ export async function replaceItems(licitacaoCodigo: number | string, items: any[
     }
   }
   return novos
+}
+
+export type HistoricoPrecoItem = {
+  ocorrencias: number
+  vitorias: number
+  taxaVitoria: number | null
+  ultimoValorGanho: number | null
+  mediaValorUnitMinimo: number | null
+}
+
+// Como esse mesmo item (por codKralen, ou por descrição quando não tem
+// Kralen) se saiu em cotações passadas — de QUALQUER licitação, não só desta
+// — pra ajudar a decidir a margem de uma cotação nova olhando pro que já
+// funcionou antes. "Ocorrência"/"vitória" só contam licitação já decidida
+// (não conta o que ainda está em aberto, que não diz nada sobre sucesso).
+export async function buscarHistoricoPrecoItem(params: { codKralen?: string; descricao?: string; idExcluir?: string }): Promise<HistoricoPrecoItem | null> {
+  const codKralen = params.codKralen?.trim()
+  const descricao = params.descricao?.trim()
+  let query = supabase
+    .from('items')
+    .select('id, valorGanho, valorUnitMinimo, vencedor, desclassificado, created_at, licitacoes(status)')
+    .order('created_at', { ascending: true })
+  if (codKralen) query = query.eq('codKralen', codKralen)
+  else if (descricao) query = query.ilike('descricao', descricao)
+  else return null
+
+  const { data, error } = await query
+  if (error) throw error
+  const rows = ((data || []) as any[]).filter(it => it.id !== params.idExcluir)
+  if (rows.length === 0) return null
+
+  const decididos = rows.filter(it => situacaoDoItem({ status: it.licitacoes?.status }, it) !== 'Em aberto')
+  const vitorias = decididos.filter(it => it.vencedor)
+  const ganhosValidos = vitorias.map(it => Number(it.valorGanho)).filter(v => Number.isFinite(v) && v > 0)
+  const minimosValidos = rows.map(it => Number(it.valorUnitMinimo)).filter(v => Number.isFinite(v) && v > 0)
+
+  return {
+    ocorrencias: decididos.length,
+    vitorias: vitorias.length,
+    taxaVitoria: decididos.length > 0 ? (vitorias.length / decididos.length) * 100 : null,
+    ultimoValorGanho: ganhosValidos.length > 0 ? ganhosValidos[ganhosValidos.length - 1] : null,
+    mediaValorUnitMinimo: minimosValidos.length > 0 ? minimosValidos.reduce((a, b) => a + b, 0) / minimosValidos.length : null,
+  }
 }
 
 // Atualiza só a linha daquele item — vencedor/valorGanho/desclassificado
