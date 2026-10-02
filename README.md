@@ -4,8 +4,10 @@ Sistema web de gestão de licitações públicas: do cadastro da licitação à 
 
 > **Status:** projeto próprio, em desenvolvimento.
 
-<!-- Capturas de tela: adicione 2 ou 3 imagens em docs/ (dashboard, detalhe da licitação, proposta em PDF) e referencie aqui:
-![Dashboard](docs/dashboard.png) -->
+<img width="1915" height="943" alt="Captura de tela 2026-10-01 230058" src="https://github.com/user-attachments/assets/8c2e502a-6940-413a-9813-078d1f99a65c" />
+<img width="1902" height="951" alt="Captura de tela 2026-10-01 230024" src="https://github.com/user-attachments/assets/a9896155-a338-4391-8457-5b740a6c6481" />
+<img width="1919" height="950" alt="Captura de tela 2026-10-01 225924" src="https://github.com/user-attachments/assets/3ef3dc12-97cd-439b-9c06-47a767912c4c" />
+
 
 ## O que o sistema faz
 
