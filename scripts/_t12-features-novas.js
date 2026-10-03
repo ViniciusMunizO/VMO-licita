@@ -77,7 +77,13 @@ async function main() {
   if (metaSalva?.periodo) await sb.from('metas').delete().eq('periodo', metaSalva.periodo)
 
   H.secao('50. Entregas — controle pós-vitória')
-  const { data: itemsLic } = await sb.from('items').select('id, descricao, quantidade, unidade').eq('licitacaoCodigo', CODIGO).order('created_at', { ascending: true })
+  // `order('created_at')` sozinho não é estável aqui: a importação em lote
+  // grava todos os itens com o mesmo timestamp (um só `now()` por insert),
+  // então o Postgres pode devolver ordens diferentes em consultas repetidas
+  // contra a mesma licitação — rodar esta suíte duas vezes sem recriar a
+  // licitação de teste escolhia um item diferente cada vez. `id` como critério
+  // de desempate garante a mesma escolha sempre.
+  const { data: itemsLic } = await sb.from('items').select('id, descricao, quantidade, unidade').eq('licitacaoCodigo', CODIGO).order('created_at', { ascending: true }).order('id', { ascending: true })
   const itemAlvo = itemsLic[0]
   // só este item fica vencedor — evita ambiguidade de qual botão "+ Registrar
   // entrega" clicar se sobrar mais de um vencedor de testes anteriores.

@@ -10,7 +10,14 @@ export function useModalA11y(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null)
   const gatilhoRef = useRef<HTMLElement | null>(null)
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  // Atualiza a cada render (sem lista de dependências), não direto no corpo
+  // da função — mexer em ref.current durante o render é o que o eslint
+  // (react-hooks/refs) pega; dentro de um efeito sem deps é o jeito correto
+  // de manter a versão mais recente do callback sem precisar re-registrar o
+  // listener de teclado toda vez que o `onClose` do componente pai muda.
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useEffect(() => {
     if (!open) return
