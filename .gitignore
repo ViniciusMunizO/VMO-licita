@@ -8,3 +8,7 @@ scripts/_codigo-teste.txt
 scripts/_anexo-teste.txt
 scripts/_pdfs/
 scripts/_shots/
+
+# Configurações por ambiente (ex.: .env.producao) também ficam fora do GitHub
+.env.*
+!.env.example

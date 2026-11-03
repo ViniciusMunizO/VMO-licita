@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { buscarRadar, acompanhar, deixarDeAcompanhar, linkPncp, POR_PAGINA, type LicitacaoRadar } from '../utils/radar'
+import { pedirLeituraEdital } from '../utils/edital'
 import { listRascunhos } from '../utils/licitacoes'
 import ConfigRadar from '../components/ConfigRadar'
 
@@ -67,6 +68,8 @@ export default function Radar() {
       } else {
         const id = await acompanhar(l.numeroControlePncp)
         setRascunhoPorNumero(m => ({ ...m, [l.numeroControlePncp]: id }))
+        // Já começa a ler o edital: quando abrir o cadastro, os campos estarão prontos.
+        pedirLeituraEdital(id).catch(() => { /* o cadastro tenta de novo ao abrir */ })
       }
       setLista(ls => ls.map(x => x.numeroControlePncp === l.numeroControlePncp ? { ...x, acompanhada: !x.acompanhada } : x))
     } catch (e: any) {

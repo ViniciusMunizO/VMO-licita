@@ -9,6 +9,21 @@ import { DateInputBR, TimeInputBR } from '../../components/DateTimeBR'
 import { listContratantes } from '../../utils/contratantes'
 import { getLicitacao, createLicitacao, updateLicitacao, previewNextCodigo, getRascunho, confirmarRascunho } from '../../utils/licitacoes'
 import { auditLog } from '../../utils/audit'
+import { replaceItems } from '../../utils/items'
+import { lerEditalDoRascunho, pedirLeituraEdital, preencherDoEdital, type EditalDoRascunho, type Origem } from '../../utils/edital'
+
+type Leitura = { estado: 'lendo' | 'pronto' | 'sem_ia' | 'teto' | 'falhou' | 'erro'; avisos?: string[]; msg?: string }
+
+const MSG_LEITURA: Record<Exclude<Leitura['estado'], 'pronto'>, string> = {
+  lendo: '📄 Lendo o edital com IA (cerca de 1 minuto). Os campos se completam sozinhos; pode ir conferindo.',
+  sem_ia: 'A leitura do edital com IA não está ligada por aqui. Complete os campos olhando o edital.',
+  teto: 'O limite diário de leitura com IA acabou. Complete olhando o edital ou tente amanhã.',
+  falhou: 'Não consegui ler este edital (arquivo ilegível ou fora do ar). Complete olhando o edital.',
+  erro: 'Não consegui buscar a leitura do edital.',
+}
+
+// Cinco minutos conferindo a cada 5 s; a leitura no servidor desiste aos 4 minutos.
+const MAX_CONFERENCIAS = 60
 
 type Licitacao = {
   codigo: number
@@ -44,6 +59,12 @@ export default function FormLicitacao() {
   const [isEditing, setIsEditing] = useState(false)
   // Rascunho do Radar sendo completado: o id do processo (ainda sem código).
   const [rascunhoId, setRascunhoId] = useState<string | null>(null)
+  // O que veio do edital (IA) e do PNCP: sugestões marcadas no formulário para conferir.
+  const [leitura, setLeitura] = useState<Leitura | null>(null)
+  const [origem, setOrigem] = useState<Record<string, Origem>>({})
+  const [itensEdital, setItensEdital] = useState<any[]>([])
+  const [salvarItens, setSalvarItens] = useState(true)
+  const [tentativa, setTentativa] = useState(0)
   const [selectedContratante, setSelectedContratante] = useState<any>(null)
   const [contratanteFocused, setContratanteFocused] = useState(false)
   const [showAttachmentsModal, setShowAttachmentsModal] = useState(false)
@@ -110,6 +131,74 @@ export default function FormLicitacao() {
     return () => { mounted = false }
   }, [])
 
+  // Só preenche o que está vazio: nunca apaga o que a pessoa já digitou.
+  const aplicarEdital = (e: EditalDoRascunho) => {
+    const p = preencherDoEdital(e)
+    setModelo(m => {
+      const n: any = { ...m }
+      for (const [campo, valor] of Object.entries(p.campos)) if (!n[campo]) n[campo] = valor
+      return n
+    })
+    setHabilitacao((h: any) => {
+      const n = { ...h }
+      for (const [campo, valor] of Object.entries(p.habilitacao)) {
+        if (valor === true) n[campo] = true
+        else if (typeof valor === 'string' && !n[campo]) n[campo] = valor
+      }
+      return n
+    })
+    setOrigem(o => ({ ...p.origem, ...o }))
+    if (p.itens.length) setItensEdital(p.itens)
+  }
+
+  // Rascunho aberto: busca a leitura do edital; se ninguém pediu ainda, pede e vai conferindo.
+  useEffect(() => {
+    if (!rascunhoId) return
+    let vivo = true
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let conferencias = 0
+    const conferir = async (jaPediu: boolean) => {
+      try {
+        const e = await lerEditalDoRascunho(rascunhoId)
+        if (!vivo) return
+        if (conferencias === 0 || e.status === 'pronto') aplicarEdital(e)
+        conferencias++
+        if (e.status === 'pronto') { setLeitura({ estado: 'pronto', avisos: e.avisos || [] }); return }
+        if (e.status === 'processando' || (jaPediu && e.status === null)) {
+          if (conferencias > MAX_CONFERENCIAS) { setLeitura({ estado: 'falhou' }); return }
+          setLeitura({ estado: 'lendo' })
+          timer = setTimeout(() => conferir(true), 5000)
+          return
+        }
+        if (jaPediu) { setLeitura({ estado: 'falhou' }); return }
+        // Nunca lido (ou a última leitura falhou): pede ao servidor do Radar.
+        const s = await pedirLeituraEdital(rascunhoId)
+        if (!vivo) return
+        if (s === 'novo' || s === 'processando' || s === 'pronto') {
+          setLeitura({ estado: 'lendo' })
+          timer = setTimeout(() => conferir(true), s === 'pronto' ? 0 : 5000)
+        } else {
+          setLeitura({ estado: s })
+        }
+      } catch (err: any) {
+        if (vivo) setLeitura({ estado: 'erro', msg: err?.message })
+      }
+    }
+    conferir(false)
+    return () => { vivo = false; clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rascunhoId, tentativa])
+
+  // Marca embaixo do campo dizendo de onde veio a sugestão.
+  const marca = (campo: string) => {
+    const o = origem[campo]
+    if (!o) return null
+    const texto = o.fonte === 'pncp' ? 'do PNCP, confira'
+      : o.fonte === 'sugestao' ? 'sugestão pelos itens, confira'
+      : `do edital${o.pagina ? `, p. ${o.pagina}` : ''}${o.confianca === 'baixa' ? ' ⚠ confira com atenção' : ', confira'}`
+    return <span className="block text-xs mt-0.5" style={{ color: 'var(--color-accent, #b45309)' }} title={o.trecho || undefined}>📄 {texto}</span>
+  }
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     setErroSalvar('')
@@ -126,6 +215,14 @@ export default function FormLicitacao() {
       const saved = isEditing ? await updateLicitacao(modelo.codigo, record)
         : rascunhoId ? await confirmarRascunho(rascunhoId, record)
         : await createLicitacao(record)
+      if (rascunhoId && salvarItens && itensEdital.length) {
+        try {
+          await replaceItems(saved.codigo, itensEdital)
+        } catch (err: any) {
+          // A licitação já está salva; só os itens ficaram de fora.
+          window.alert(`Licitação ${saved.codigo} salva, mas os itens do edital não foram gravados: ${err?.message || 'erro desconhecido'}. Use "Importar Itens" na licitação.`)
+        }
+      }
       try {
         const userName = localStorage.getItem('user_name') || undefined
         await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: saved.codigo, ...(rascunhoId ? { doRadar: true } : {}) }, userName)
@@ -148,7 +245,18 @@ export default function FormLicitacao() {
     <div className="bg-white p-4 sm:p-6 rounded shadow max-w-5xl mx-auto">
       <h3 className="text-xl font-semibold mb-4">{isEditing ? `Editar Licitação ${modelo.codigo}` : rascunhoId ? 'Cadastrar licitação do Radar' : 'Nova Licitação'}</h3>
       {rascunhoId && (
-        <p className="text-sm text-gray-600 -mt-2 mb-4">Já vem com o que o PNCP informa. Confira no edital, complete o resto e salve: a licitação ganha o próximo código da empresa e sai dos rascunhos.</p>
+        <p className="text-sm text-gray-600 -mt-2 mb-4">Já vem com o que o PNCP informa e com a leitura do edital pela IA. Confira cada campo marcado com 📄, complete o resto e salve: a licitação ganha o próximo código da empresa e sai dos rascunhos.</p>
+      )}
+      {rascunhoId && leitura && (
+        <div role="status" className="text-sm rounded p-3 mb-4" style={{ background: 'var(--color-bg-subtle, #f3f4f6)' }}>
+          {leitura.estado === 'pronto'
+            ? <p>📄 Campos preenchidos com a leitura do edital pela IA. A IA pode errar: confira no edital antes de salvar.</p>
+            : <p>{MSG_LEITURA[leitura.estado]}{leitura.msg ? ` (${leitura.msg})` : ''}</p>}
+          {leitura.avisos?.map((a, i) => <p key={i} className="text-gray-600 mt-1">{a}</p>)}
+          {(leitura.estado === 'falhou' || leitura.estado === 'erro') && (
+            <button type="button" className="btn btn-ghost mt-2" onClick={() => setTentativa(t => t + 1)}>Tentar ler de novo</button>
+          )}
+        </div>
       )}
       <form onSubmit={save} className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -220,6 +328,7 @@ export default function FormLicitacao() {
           <div>
             <label htmlFor="f-portal" className="block text-sm text-gray-600">Portal Eletrônico</label>
             <input id="f-portal" value={(modelo as any).portal || ''} onChange={e => setModelo({ ...modelo, portal: e.target.value })} className="w-full p-2 rounded" />
+            {marca('portal')}
           </div>
           <div>
             <label htmlFor="f-tipoObjeto" className="block text-sm text-gray-600">Tipo Objeto</label>
@@ -229,6 +338,7 @@ export default function FormLicitacao() {
               <option>Materiais</option>
               <option>Misto</option>
             </select>
+            {marca('tipoObjeto')}
           </div>
         </div>
 
@@ -269,6 +379,7 @@ export default function FormLicitacao() {
               <option>Aberto-Fechado</option>
               <option>Fechado-Aberto</option>
             </select>
+            {marca('tipoDisputa')}
           </div>
           <div>
             <label htmlFor="f-definJulgamento" className="block text-sm text-gray-600">Definição de Julgamento</label>
@@ -277,6 +388,7 @@ export default function FormLicitacao() {
               <option>Item</option>
               <option>Lote</option>
             </select>
+            {marca('definJulgamento')}
           </div>
         </div>
 
@@ -291,6 +403,7 @@ export default function FormLicitacao() {
             <div>
               <label htmlFor="f-dataLimiteImpugnacao" className="block text-sm text-gray-600">Data-limite pra Impugnação</label>
               <DateInputBR id="f-dataLimiteImpugnacao" value={(modelo as any).dataLimiteImpugnacao || ''} onChange={v => setModelo({ ...modelo, dataLimiteImpugnacao: v })} className="w-full p-2 rounded" />
+              {marca('dataLimiteImpugnacao')}
             </div>
           </div>
         </div>
@@ -301,32 +414,39 @@ export default function FormLicitacao() {
             <div>
               <label htmlFor="f-prazoValidade" className="block text-sm text-gray-600">Validade da Proposta</label>
               <input id="f-prazoValidade" value={(modelo as any).prazoValidade || ''} onChange={e => setModelo({ ...modelo, prazoValidade: e.target.value })} className="w-full p-2 rounded" />
+              {marca('prazoValidade')}
             </div>
             <div>
               <label htmlFor="f-prazoEntrega" className="block text-sm text-gray-600">Prazo de Entrega</label>
               <input id="f-prazoEntrega" value={(modelo as any).prazoEntrega || ''} onChange={e => setModelo({ ...modelo, prazoEntrega: e.target.value })} className="w-full p-2 rounded" />
+              {marca('prazoEntrega')}
             </div>
             <div>
               <label htmlFor="f-localEntrega" className="block text-sm text-gray-600">Local de Entrega</label>
               <input id="f-localEntrega" value={(modelo as any).localEntrega || ''} onChange={e => setModelo({ ...modelo, localEntrega: e.target.value })} className="w-full p-2 rounded" />
+              {marca('localEntrega')}
             </div>
             <div>
               <label htmlFor="f-prazoPagamento" className="block text-sm text-gray-600">Prazo de Pagamento</label>
               <input id="f-prazoPagamento" value={(modelo as any).prazoPagamento || ''} onChange={e => setModelo({ ...modelo, prazoPagamento: e.target.value })} className="w-full p-2 rounded" />
+              {marca('prazoPagamento')}
             </div>
             <div>
               <label htmlFor="f-prazoGarantia" className="block text-sm text-gray-600">Prazo de Garantia</label>
               <input id="f-prazoGarantia" value={(modelo as any).prazoGarantia || 'Conforme Edital'} onChange={e => setModelo({ ...modelo, prazoGarantia: e.target.value })} className="w-full p-2 rounded" />
+              {marca('prazoGarantia')}
             </div>
             <div>
               <label htmlFor="f-vigenciaContrato" className="block text-sm text-gray-600">Vigência do Contrato</label>
               <input id="f-vigenciaContrato" value={(modelo as any).vigenciaContrato || '12 (doze) meses'} onChange={e => setModelo({ ...modelo, vigenciaContrato: e.target.value })} className="w-full p-2 rounded" />
+              {marca('vigenciaContrato')}
             </div>
           </div>
         </div>
 
         <div className="mt-6 bg-white border rounded p-4">
           <h4 className="font-semibold mb-2">Habilitação (Checklist)</h4>
+          {origem.habilitacao && <p className="mb-2">{marca('habilitacao')}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.habilitacaoJuridica} onChange={e => setHabilitacao({ ...habilitacao, habilitacaoJuridica: e.target.checked })} /> Habilitação Jurídica</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.habilitacaoFiscal} onChange={e => setHabilitacao({ ...habilitacao, habilitacaoFiscal: e.target.checked })} /> Habilitação Fiscal, Social e Trabalhista</label>
@@ -348,6 +468,32 @@ export default function FormLicitacao() {
             <textarea id="f-observacaoInterna" value={habilitacao.observacaoInterna} onChange={e => setHabilitacao({ ...habilitacao, observacaoInterna: e.target.value })} className="w-full p-2 rounded" />
           </div>
         </div>
+
+        {rascunhoId && itensEdital.length > 0 && (
+          <div className="mt-6 bg-white border rounded p-4">
+            <h4 className="font-semibold mb-1">Itens do edital ({itensEdital.length})</h4>
+            <p className="text-xs mb-2" style={{ color: 'var(--color-accent, #b45309)' }}>📄 lidos do edital pela IA, confira quantidades e unidades. O valor de referência entra na coluna Município.</p>
+            <div className="overflow-x-auto max-h-72 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="text-left text-gray-600"><th className="p-1">Item</th><th className="p-1">Descrição</th><th className="p-1">Unid.</th><th className="p-1">Qtd.</th><th className="p-1">Valor ref.</th></tr></thead>
+                <tbody>
+                  {itensEdital.map((it, i) => (
+                    <tr key={i} className="border-t border-gray-100 align-top">
+                      <td className="p-1">{it.item}</td>
+                      <td className="p-1">{it.descricao}</td>
+                      <td className="p-1">{it.unidade}</td>
+                      <td className="p-1">{it.quantidade ?? '—'}</td>
+                      <td className="p-1">{it.valorUnitMunicipio != null ? it.valorUnitMunicipio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <label className="flex items-center gap-2 mt-2 text-sm">
+              <input type="checkbox" checked={salvarItens} onChange={e => setSalvarItens(e.target.checked)} /> Salvar estes itens junto com a licitação
+            </label>
+          </div>
+        )}
 
         {erroSalvar && (
           <div role="alert" className="p-3 rounded text-sm" style={{ backgroundColor: 'var(--color-error-text)', color: '#fff' }}>
