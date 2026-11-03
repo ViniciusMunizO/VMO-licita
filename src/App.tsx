@@ -4,7 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AdminRoute } from './components/AdminRoute'
 import { useAuth } from './context/AuthContext'
 import Logo from './components/Logo'
-import { IconLicitacoes, IconRelatorios, IconEmpresa, IconUsuarios, IconMenu, IconFechar, IconRadar } from './components/NavIcons'
+import { IconLicitacoes, IconRelatorios, IconEmpresa, IconUsuarios, IconMenu, IconFechar, IconRadar, IconEstrela } from './components/NavIcons'
 import SinoAlertas from './components/SinoAlertas'
 
 // Cada página vira um chunk próprio, baixado só quando a rota é visitada —
@@ -21,6 +21,7 @@ const Users = lazy(() => import('./pages/Users'))
 const CompanyInfo = lazy(() => import('./pages/CompanyInfo'))
 const AdminAudit = lazy(() => import('./pages/AdminAudit'))
 const Radar = lazy(() => import('./pages/Radar'))
+const Acompanhando = lazy(() => import('./pages/Acompanhando'))
 
 function NavItem({ to, icon, children, onClick }: { to: string; icon: React.ReactNode; children: React.ReactNode; onClick?: () => void }) {
   return (
@@ -99,6 +100,7 @@ export default function App() {
               <div className="hidden lg:flex items-center gap-1">
                 <NavItem to="/licitacoes" icon={<IconLicitacoes />}>Licitações</NavItem>
                 <NavItem to="/radar" icon={<IconRadar />}>Radar</NavItem>
+                <NavItem to="/acompanhando" icon={<IconEstrela />}>Acompanhando</NavItem>
                 <NavItem to="/relatorios" icon={<IconRelatorios />}>Relatórios</NavItem>
                 {user?.role === 'admin' && (
                   <NavItem to="/empresa" icon={<IconEmpresa />}>Informações da Empresa</NavItem>
@@ -152,6 +154,7 @@ export default function App() {
               <div className="container-fixed py-2 flex flex-col gap-0.5">
                 <NavItem to="/licitacoes" icon={<IconLicitacoes />} onClick={() => setMenuAberto(false)}>Licitações</NavItem>
                 <NavItem to="/radar" icon={<IconRadar />} onClick={() => setMenuAberto(false)}>Radar</NavItem>
+                <NavItem to="/acompanhando" icon={<IconEstrela />} onClick={() => setMenuAberto(false)}>Acompanhando</NavItem>
                 <NavItem to="/relatorios" icon={<IconRelatorios />} onClick={() => setMenuAberto(false)}>Relatórios</NavItem>
                 {user?.role === 'admin' && (
                   <NavItem to="/empresa" icon={<IconEmpresa />} onClick={() => setMenuAberto(false)}>Informações da Empresa</NavItem>
@@ -178,6 +181,7 @@ export default function App() {
             <Route path="/licitacoes/novo" element={<ProtectedRoute><FormLicitacao /></ProtectedRoute>} />
             <Route path="/licitacoes/:codigo" element={<ProtectedRoute><DetailLicitacao /></ProtectedRoute>} />
             <Route path="/radar" element={<ProtectedRoute><Radar /></ProtectedRoute>} />
+            <Route path="/acompanhando" element={<ProtectedRoute><Acompanhando /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><RelatoriosIndex /></ProtectedRoute>} />
             <Route path="/empresa" element={<AdminRoute><CompanyInfo /></AdminRoute>} />
             <Route path="/users" element={<AdminRoute roles={['admin', 'moderador']}><Users /></AdminRoute>} />

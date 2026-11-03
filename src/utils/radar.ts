@@ -57,6 +57,74 @@ export async function buscarRadar(busca: BuscaRadar = {}): Promise<{ lista: Lici
   }
 }
 
+function paraLicitacao(l: any, acompanhada: boolean): LicitacaoRadar {
+  return {
+    numeroControlePncp: l.numero_controle_pncp,
+    orgao: l.orgao,
+    municipio: l.municipio,
+    uf: l.uf,
+    modalidade: l.modalidade,
+    objeto: l.objeto,
+    valorEstimado: l.valor_estimado,
+    encerramento: l.encerramento_propostas,
+    link: l.link,
+    acompanhada,
+  }
+}
+
+export type BuscaConversa = {
+  ufs: string[] | null
+  municipio: string | null
+  ate: Date | null
+  publicadasDesde: Date | null
+  deslocamento: number
+  limite: number
+}
+
+/** A busca da conversa: lugar e período livres, do mesmo jeito que o /licitacoes do bot. */
+export async function buscarRadarConversa(b: BuscaConversa): Promise<{ lista: LicitacaoRadar[]; total: number }> {
+  const { data, error } = await supabase.rpc('radar_licitacoes', {
+    p_empresa: empresaAtual(),
+    p_ufs: b.ufs,
+    p_municipio: b.municipio,
+    p_ate: b.ate?.toISOString() ?? null,
+    p_publicadas_desde: b.publicadasDesde?.toISOString() ?? null,
+    p_limite: b.limite,
+    p_deslocamento: b.deslocamento,
+  })
+  if (error) throw error
+  const linhas = (data || []) as { licitacao: any; total: number; acompanhada: boolean }[]
+  return {
+    total: Number(linhas[0]?.total || 0),
+    lista: linhas.filter(x => x?.licitacao).map(({ licitacao, acompanhada }) => paraLicitacao(licitacao, acompanhada)),
+  }
+}
+
+export type Acompanhada = LicitacaoRadar & {
+  acompanhadaEm: string
+  processoId: string | null
+  rascunho: boolean
+  codigo: number | null
+}
+
+/** Todas as que a empresa acompanha (pelo site ou pelo bot), abertas primeiro. Migração 0016. */
+export async function listarAcompanhadas(): Promise<Acompanhada[]> {
+  const { data, error } = await supabase.rpc('acompanhadas_radar', { p_empresa: empresaAtual() })
+  if (error) {
+    if (error.code === 'PGRST202' || /could not find the function/i.test(error.message || '')) {
+      throw new Error('A página Acompanhando ainda não está ativa no banco: falta rodar a migração 0016_acompanhando_no_site.sql.')
+    }
+    throw error
+  }
+  return ((data || []) as any[]).map(r => ({
+    ...paraLicitacao(r.licitacao, true),
+    acompanhadaEm: r.acompanhada_em,
+    processoId: r.processo_id,
+    rascunho: Boolean(r.rascunho),
+    codigo: r.codigo ?? null,
+  }))
+}
+
 /** Marca para acompanhar (lembretes) e cria o rascunho do processo. Devolve o id do rascunho. */
 export async function acompanhar(numeroControlePncp: string): Promise<string> {
   const { data, error } = await supabase.rpc('acompanhar_licitacao', {
