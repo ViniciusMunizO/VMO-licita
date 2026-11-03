@@ -47,15 +47,25 @@ const HABILITACAO_ITEMS: { key: string; label: string }[] = [
   { key: 'outras', label: 'Outras declarações' },
 ]
 
-// Abre o conteúdo (já todo em estilo inline, sem depender do CSS do app) numa
-// aba nova e aciona o diálogo de impressão nativo do navegador.
+// Imprime o conteúdo (já todo em estilo inline, sem depender do CSS do app) por um quadro
+// escondido na própria página. Antes abria uma janela nova, e o navegador que bloqueia
+// janelas novas deixava o botão sem fazer nada, sem aviso.
 function printElement(el: HTMLElement, title: string) {
-  const win = window.open('', '_blank', 'width=900,height=1000')
-  if (!win) return
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8" /><title>${title}</title></head><body style="margin:0">${el.outerHTML}</body></html>`)
-  win.document.close()
-  win.focus()
-  setTimeout(() => { win.print() }, 300)
+  const quadro = document.createElement('iframe')
+  quadro.setAttribute('aria-hidden', 'true')
+  quadro.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
+  document.body.appendChild(quadro)
+  const doc = quadro.contentDocument
+  if (!doc || !quadro.contentWindow) { quadro.remove(); return }
+  doc.open()
+  doc.write(`<!doctype html><html><head><meta charset="utf-8" /><title>${title}</title></head><body style="margin:0">${el.outerHTML}</body></html>`)
+  doc.close()
+  setTimeout(() => {
+    quadro.contentWindow?.focus()
+    quadro.contentWindow?.print()
+    // Some depois que o diálogo de impressão fecha (dar um tempo cobre os navegadores que não avisam).
+    setTimeout(() => quadro.remove(), 60_000)
+  }, 300)
 }
 
 const ITEM_FIELDS: { key: string; label: string; wide?: boolean }[] = [
@@ -873,6 +883,10 @@ export default function DetailLicitacao() {
           if (!printRef.current) return
           printElement(printRef.current, `Checklist — Licitação ${model.codigo}`)
         }} className="btn btn-primary disabled:opacity-50">Imprimir Checklist</button>
+        <button disabled={carregandoDados} onClick={async () => {
+          if (!printRef.current) return
+          await exportElementsToPdf([printRef.current], `checklist_${model.codigo}.pdf`, `Checklist — Licitação ${model.codigo}`)
+        }} className="btn btn-primary disabled:opacity-50">Baixar Checklist (PDF)</button>
         <button disabled={carregandoDados} onClick={async () => {
           if (!itemsRef.current) return
           await exportElementsToPdf([itemsRef.current], `itens_${model.codigo}.pdf`, 'Itens', 'landscape')
