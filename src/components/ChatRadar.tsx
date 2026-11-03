@@ -195,7 +195,12 @@ export default function ChatRadar({ onAbrirFiltros, versaoFiltros }: Props) {
     if (!lista.length) {
       setUltima({ onde, chave, proximo: null })
       if (desloc > 0) { bot('Não há mais licitações aqui.', [[outroPeriodo, outroLugar]]); return }
-      const dica = foraDaColeta(filtro, ufsRef.current) ?? 'Tente um período maior, outro lugar ou mude os filtros.'
+      // A busca procura o trecho exato: "medicamentos" não acha "medicamento". Avisa quem escreveu no plural.
+      const plurais = palavrasRef.current.filter(p => p.length >= 5 && /s$/i.test(p))
+      const dicaPlural = plurais.length
+        ? `\nDica: escreva as palavras no singular ("${plurais[0].replace(/s$/i, '')}" acha "${plurais[0].replace(/s$/i, '')}" e "${plurais[0]}"; "${plurais[0]}" não acha "${plurais[0].replace(/s$/i, '')}").`
+        : ''
+      const dica = (foraDaColeta(filtro, ufsRef.current) ?? 'Tente um período maior, outro lugar ou mude os filtros.') + dicaPlural
       bot(`${cabecalho}\nNão achei licitação de ${ramosCurtos()} aqui.\n${dica}`, [
         [outroPeriodo, outroLugar],
         [{ texto: '⚙️ Mudar filtros', acao: { t: 'comando', c: 'filtros' } }],
