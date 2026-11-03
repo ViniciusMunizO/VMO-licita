@@ -198,3 +198,81 @@ export function preencherDoEdital(e: EditalDoRascunho): Preenchimento {
 
   return { campos, habilitacao, itens, origem }
 }
+
+// ---------------------------------------------------------------------------
+// Itens: a lista oficial do PNCP (completa e com os números certos). A IA lê só parte das
+// tabelas longas, então ela entra apenas para completar a descrição do mesmo item.
+// ---------------------------------------------------------------------------
+
+export type ItemCadastro = {
+  item: string
+  descricao: string
+  unidade: string
+  quantidade: number | null
+  valorUnitMunicipio: number | null
+  valorTotalMunicipio: number | null
+}
+
+type ItemPncp = {
+  numeroItem: number
+  descricao?: string | null
+  unidadeMedida?: string | null
+  quantidade?: number | null
+  valorUnitarioEstimado?: number | null
+  valorTotal?: number | null
+  orcamentoSigiloso?: boolean | null
+}
+
+/** "78640489000153-1-000893/2026" -> pedaços da URL do PNCP; formato estranho -> null. */
+export function partesDoNumero(numero: string): { cnpj: string; ano: string; sequencial: number } | null {
+  const m = numero.match(/^(\d{14})-\d+-(\d+)\/(\d{4})$/)
+  return m ? { cnpj: m[1], ano: m[3], sequencial: Number(m[2]) } : null
+}
+
+/** Itens do PNCP no formato da tabela do cadastro. Orçamento sigiloso vem com 0: aí fica sem valor. */
+export function itensDePncp(lista: ItemPncp[]): ItemCadastro[] {
+  return [...lista]
+    .sort((a, b) => a.numeroItem - b.numeroItem)
+    .map(i => {
+      const sigiloso = Boolean(i.orcamentoSigiloso)
+      const unitario = sigiloso || i.valorUnitarioEstimado == null ? null : Number(i.valorUnitarioEstimado)
+      const quantidade = i.quantidade == null ? null : Number(i.quantidade)
+      const total = sigiloso ? null : i.valorTotal != null ? Number(i.valorTotal)
+        : quantidade != null && unitario != null ? Math.round(quantidade * unitario * 100) / 100 : null
+      return {
+        item: String(i.numeroItem),
+        descricao: curto((i.descricao || '').trim() || 'Item sem descrição no PNCP', 2000),
+        unidade: (i.unidadeMedida || '').trim(),
+        quantidade,
+        valorUnitMunicipio: unitario,
+        valorTotalMunicipio: total,
+      }
+    })
+}
+
+/** Lista do PNCP + descrição mais completa que a IA leu no edital para o mesmo número de item. */
+export function juntarItens(pncp: ItemCadastro[], ia: ItemCadastro[]): ItemCadastro[] {
+  const daIa = new Map(ia.map(i => [i.item.replace(/^0+/, ''), i]))
+  return pncp.map(p => {
+    const lido = daIa.get(p.item.replace(/^0+/, ''))
+    return lido && lido.descricao.length > p.descricao.length ? { ...p, descricao: lido.descricao } : p
+  })
+}
+
+/** Busca no PNCP (que aceita pedidos do navegador) todos os itens da compra. Falhou ou não achou -> []. */
+export async function itensDoPncp(numero: string | null): Promise<ItemCadastro[]> {
+  const partes = numero ? partesDoNumero(numero) : null
+  if (!partes) return []
+  const tamanho = 500
+  const todos: ItemPncp[] = []
+  for (let pagina = 1; pagina <= 10; pagina++) {
+    const url = `https://pncp.gov.br/api/pncp/v1/orgaos/${partes.cnpj}/compras/${partes.ano}/${partes.sequencial}/itens?pagina=${pagina}&tamanhoPagina=${tamanho}`
+    const r = await fetch(url)
+    if (r.status === 204) break
+    if (!r.ok) throw new Error(`PNCP respondeu ${r.status}`)
+    const lote = ((await r.json()) ?? []) as ItemPncp[]
+    todos.push(...lote)
+    if (lote.length < tamanho) break
+  }
+  return itensDePncp(todos)
+}

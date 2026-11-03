@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ContractorModal from '../../components/ContractorModal'
@@ -10,7 +10,7 @@ import { listContratantes } from '../../utils/contratantes'
 import { getLicitacao, createLicitacao, updateLicitacao, previewNextCodigo, getRascunho, confirmarRascunho } from '../../utils/licitacoes'
 import { auditLog } from '../../utils/audit'
 import { replaceItems } from '../../utils/items'
-import { lerEditalDoRascunho, pedirLeituraEdital, preencherDoEdital, type EditalDoRascunho, type Origem } from '../../utils/edital'
+import { itensDoPncp, juntarItens, lerEditalDoRascunho, pedirLeituraEdital, preencherDoEdital, type EditalDoRascunho, type ItemCadastro, type Origem } from '../../utils/edital'
 
 type Leitura = { estado: 'lendo' | 'pronto' | 'sem_ia' | 'teto' | 'falhou' | 'erro'; avisos?: string[]; msg?: string }
 
@@ -62,7 +62,11 @@ export default function FormLicitacao() {
   // O que veio do edital (IA) e do PNCP: sugestões marcadas no formulário para conferir.
   const [leitura, setLeitura] = useState<Leitura | null>(null)
   const [origem, setOrigem] = useState<Record<string, Origem>>({})
-  const [itensEdital, setItensEdital] = useState<any[]>([])
+  // Itens: a lista oficial do PNCP manda; os lidos pela IA só completam descrições
+  // (ou valem sozinhos quando o PNCP não traz lista).
+  const [numeroPncp, setNumeroPncp] = useState<string | null>(null)
+  const [itensPncp, setItensPncp] = useState<ItemCadastro[] | null>(null)
+  const [itensIa, setItensIa] = useState<ItemCadastro[]>([])
   const [salvarItens, setSalvarItens] = useState(true)
   const [tentativa, setTentativa] = useState(0)
   const [selectedContratante, setSelectedContratante] = useState<any>(null)
@@ -148,8 +152,25 @@ export default function FormLicitacao() {
       return n
     })
     setOrigem(o => ({ ...p.origem, ...o }))
-    if (p.itens.length) setItensEdital(p.itens)
+    if (p.itens.length) setItensIa(p.itens)
+    if (e.numero) setNumeroPncp(e.numero)
   }
+
+  // Lista oficial dos itens no PNCP (completa, ao contrário da leitura da IA em tabelas longas).
+  useEffect(() => {
+    if (!numeroPncp) return
+    let vivo = true
+    itensDoPncp(numeroPncp)
+      .then(l => { if (vivo) setItensPncp(l) })
+      .catch(() => { if (vivo) setItensPncp([]) })
+    return () => { vivo = false }
+  }, [numeroPncp])
+
+  const itensDoPncpValem = Boolean(itensPncp && itensPncp.length)
+  const itensEdital = useMemo(
+    () => (itensDoPncpValem ? juntarItens(itensPncp!, itensIa) : itensIa),
+    [itensPncp, itensIa, itensDoPncpValem],
+  )
 
   // Rascunho aberto: busca a leitura do edital; se ninguém pediu ainda, pede e vai conferindo.
   useEffect(() => {
@@ -471,8 +492,11 @@ export default function FormLicitacao() {
 
         {rascunhoId && itensEdital.length > 0 && (
           <div className="mt-6 bg-white border rounded p-4">
-            <h4 className="font-semibold mb-1">Itens do edital ({itensEdital.length})</h4>
-            <p className="text-xs mb-2" style={{ color: 'var(--color-accent, #b45309)' }}>📄 lidos do edital pela IA, confira quantidades e unidades. O valor de referência entra na coluna Município.</p>
+            <h4 className="font-semibold mb-1">{itensDoPncpValem ? 'Itens da licitação' : 'Itens do edital'} ({itensEdital.length})</h4>
+            <p className="text-xs mb-2" style={{ color: 'var(--color-accent, #b45309)' }}>{itensDoPncpValem
+              ? '📋 Lista oficial do PNCP: número, quantidade, unidade e valor de referência. Quando a IA leu o mesmo item no edital com mais detalhe, a descrição vem do edital.'
+              : '📄 Lidos do edital pela IA (o PNCP não trouxe a lista): em tabelas longas ela pode pular itens, confira com o edital.'}
+            {' '}O valor de referência entra na coluna Município.</p>
             <div className="overflow-x-auto max-h-72 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-gray-600"><th className="p-1">Item</th><th className="p-1">Descrição</th><th className="p-1">Unid.</th><th className="p-1">Qtd.</th><th className="p-1">Valor ref.</th></tr></thead>
