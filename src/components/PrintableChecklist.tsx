@@ -55,7 +55,7 @@ const ITEM_COLUMNS: { key: string; label: string; width: string; fallback?: stri
   { key: 'valorUnitMunicipio', label: 'Valor Município', width: '7%', numeric: true },
   { key: 'valorTotalMunicipio', label: 'Total Município', width: '7%', numeric: true },
   { key: 'vencedor', label: 'Vencedor', width: '5%', boolean: true },
-  { key: 'valorGanho', label: 'Valor Ganho', width: '5%' },
+  { key: 'valorGanho', label: 'Valor Ganho', width: '5%', numeric: true },
 ]
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {

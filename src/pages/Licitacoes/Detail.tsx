@@ -757,7 +757,7 @@ export default function DetailLicitacao() {
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-800">{it.valorGanho}</span>
+                              <span className="text-sm font-medium text-gray-800">{formatFixed(it.valorGanho)}</span>
                               <button
                                 onClick={() => setEditingValorGanhoIdx(idx)}
                                 className="text-xs text-gray-400 hover:text-gray-600 underline"
