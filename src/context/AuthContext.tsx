@@ -85,6 +85,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    // E-mail não confirmado não é senha errada: dizer isso poupa a pessoa de trocar a senha à toa.
+    if (error?.code === 'email_not_confirmed') throw new Error('Este e-mail ainda não foi confirmado. Confirme pelo link enviado ou peça ao administrador.')
     if (error || !data.user) throw new Error('Login ou senha inválidos')
     const u = await montarUsuario(data.user.id, data.user.email || '')
     localStorage.setItem('user_name', u.name)
