@@ -235,8 +235,8 @@ export default function ChatRadar({ onAbrirFiltros, versaoFiltros }: Props) {
     const abertas = lista.filter(l => l.encerramento && new Date(l.encerramento).getTime() > Date.now())
     const linhas = (prazos ? abertas : lista).slice(0, 5).map(l => `• ${linhaPrazo(l.encerramento)} – ${(l.objeto || 'Objeto não informado').slice(0, 70)}`)
     const cab = prazos
-      ? abertas.length ? `📅 Prazos das acompanhadas (${abertas.length} abertas):` : 'Nenhuma acompanhada está aberta agora.'
-      : `⭐ Você acompanha ${lista.length === 1 ? '1 licitação' : `${lista.length} licitações`} (${abertas.length} abertas). As próximas:`
+      ? abertas.length ? `📅 Prazos das acompanhadas (${abertas.length === 1 ? '1 aberta' : `${abertas.length} abertas`}):` : 'Nenhuma acompanhada está aberta agora.'
+      : `⭐ Você acompanha ${lista.length === 1 ? '1 licitação' : `${lista.length} licitações`} (${abertas.length === 1 ? '1 aberta' : `${abertas.length} abertas`}). As próximas:`
     bot([cab, ...linhas].join('\n'), abrir)
   }
 
@@ -247,7 +247,7 @@ export default function ChatRadar({ onAbrirFiltros, versaoFiltros }: Props) {
     if (c === 'filtros') {
       onAbrirFiltros()
       const f = await lerFiltrosRadar()
-      const palavras = f.palavrasChave.length ? `${f.palavrasChave.length} palavras (${f.palavrasChave.slice(0, 5).join(', ')}${f.palavrasChave.length > 5 ? '…' : ''})` : 'nenhuma palavra'
+      const palavras = f.palavrasChave.length ? `${f.palavrasChave.length === 1 ? '1 palavra' : `${f.palavrasChave.length} palavras`} (${f.palavrasChave.slice(0, 5).join(', ')}${f.palavrasChave.length > 5 ? '…' : ''})` : 'nenhuma palavra'
       return bot(`⚙️ O que eu procuro: ${palavras}\n📍 Estados: ${f.ufs.join(', ') || 'nenhum'}\n💰 Valor mínimo: ${f.valorMinimo ? valorBR(f.valorMinimo) : 'qualquer'}\n\nAbri os filtros no topo da página para você mudar.`)
     }
     if (c === 'mais') {
