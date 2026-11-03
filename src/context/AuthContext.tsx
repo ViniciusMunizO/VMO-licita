@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { supabase } from '../utils/supabaseClient'
-import { getProfile } from '../utils/auth'
+import { getProfile, EmpresaDoUsuario } from '../utils/auth'
+import { definirEmpresaAtual } from '../utils/banco'
 
 type User = {
   id: string
@@ -8,6 +9,10 @@ type User = {
   email: string
   role: 'admin' | 'moderador' | 'user'
   ativo: boolean
+  // Empresa aberta agora e todas as da pessoa (quem é de duas troca no topo).
+  empresaId: string | null
+  empresaNome: string | null
+  empresas: EmpresaDoUsuario[]
 }
 
 type AuthContextValue = {
@@ -15,6 +20,7 @@ type AuthContextValue = {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  trocarEmpresa: (empresaId: string) => void
   // true a partir do momento em que o link de "esqueci minha senha" é aberto
   // (o Supabase autentica a sessão nesse instante) até a senha nova ser
   // definida — usado pelo App pra travar a tela em "Definir nova senha" em
@@ -24,6 +30,20 @@ type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+
+async function montarUsuario(id: string, email: string): Promise<User> {
+  const { profile, empresas, empresa } = await getProfile(id, email)
+  return {
+    id,
+    name: profile.name,
+    email,
+    role: profile.role,
+    ativo: profile.ativo,
+    empresaId: empresa?.id || null,
+    empresaNome: empresa?.nome || null,
+    empresas,
+  }
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
@@ -40,9 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (mounted) setUser(null)
         return
       }
-      const profile = await getProfile(session.user.id, session.user.email || '')
+      const u = await montarUsuario(session.user.id, session.user.email || '')
       if (!mounted) return
-      const u: User = { id: session.user.id, name: profile.name, email: session.user.email || '', role: profile.role, ativo: profile.ativo }
       localStorage.setItem('user_name', u.name)
       setUser(u)
     }
@@ -67,22 +86,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error || !data.user) throw new Error('Login ou senha inválidos')
-    const profile = await getProfile(data.user.id, data.user.email || '')
-    const u: User = { id: data.user.id, name: profile.name, email: data.user.email || '', role: profile.role, ativo: profile.ativo }
+    const u = await montarUsuario(data.user.id, data.user.email || '')
     localStorage.setItem('user_name', u.name)
     setUser(u)
   }
 
   const logout = () => {
     supabase.auth.signOut()
+    definirEmpresaAtual(null)
     setUser(null)
     setPasswordRecovery(false)
+  }
+
+  // Recarrega a página inteira de propósito: cada tela guarda listas da
+  // empresa anterior no próprio estado, e começar do zero é o jeito mais
+  // simples de garantir que nada da outra empresa fica aparecendo.
+  const trocarEmpresa = (empresaId: string) => {
+    definirEmpresaAtual(empresaId)
+    window.location.assign('/')
   }
 
   const concluirRedefinicaoSenha = () => setPasswordRecovery(false)
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, passwordRecovery, concluirRedefinicaoSenha }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, trocarEmpresa, passwordRecovery, concluirRedefinicaoSenha }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { empresaAtual } from './banco'
 
 // Anexos (de licitação e de ata/contrato) ficam no bucket "anexos" do Supabase
 // Storage; no banco fica só o caminho do objeto. Antes o arquivo inteiro ia em
@@ -7,7 +8,11 @@ import { supabase } from './supabaseClient'
 //
 // O bucket é privado, então não existe URL fixa: cada abertura/download gera
 // uma URL assinada de curta duração, que só o Storage emite pra quem está
-// logado e ativo (política no schema.sql).
+// logado e ativo.
+//
+// Cada empresa tem a própria pasta: todo caminho começa com o id da empresa
+// (<empresa>/licitacoes/3/..., <empresa>/empresa/...). O banco só deixa
+// mexer na pasta das empresas da pessoa (migração 0012 do Radar).
 export const BUCKET_ANEXOS = 'anexos'
 
 // Mesmo limite declarado no bucket (file_size_limit). Checar no cliente é só
@@ -41,7 +46,7 @@ export async function uploadAnexo(f: File, prefixo: string): Promise<AnexoEnviad
   if (f.size > MAX_ANEXO_BYTES) {
     throw new Error(`O arquivo tem ${formatarTamanho(f.size)} e o limite é ${formatarTamanho(MAX_ANEXO_BYTES)}. Anexe uma versão menor (ou compactada).`)
   }
-  const path = `${prefixo}/${crypto.randomUUID()}-${sanitizarNome(f.name)}`
+  const path = `${empresaAtual()}/${prefixo}/${crypto.randomUUID()}-${sanitizarNome(f.name)}`
   const { error } = await supabase.storage.from(BUCKET_ANEXOS).upload(path, f, {
     contentType: f.type || 'application/octet-stream',
     upsert: false,
@@ -56,7 +61,7 @@ export async function uploadAnexo(f: File, prefixo: string): Promise<AnexoEnviad
 // (`removerDoStorage`), e isso não pode levar junto o documento original
 // da empresa nem os anexos de outras licitações que usaram o mesmo documento.
 export async function copiarNoStorage(pathOrigem: string, prefixoDestino: string, nomeOriginal: string, mime: string, size: number): Promise<AnexoEnviado> {
-  const path = `${prefixoDestino}/${crypto.randomUUID()}-${sanitizarNome(nomeOriginal)}`
+  const path = `${empresaAtual()}/${prefixoDestino}/${crypto.randomUUID()}-${sanitizarNome(nomeOriginal)}`
   const { error } = await supabase.storage.from(BUCKET_ANEXOS).copy(pathOrigem, path)
   if (error) throw new Error(`Não consegui copiar o arquivo: ${error.message}`)
   return { path, filename: nomeOriginal, mime, size }

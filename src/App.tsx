@@ -45,7 +45,8 @@ function iniciais(nome?: string) {
 }
 
 export default function App() {
-  const { user, logout, passwordRecovery } = useAuth()
+  const { user, logout, trocarEmpresa, passwordRecovery } = useAuth()
+  const empresasLiberadas = (user?.empresas || []).filter(e => e.ativo)
   const nav = useNavigate()
   const location = useLocation()
   // Abaixo de `lg` os itens viram gaveta. O corte é em `lg` e não em `md`
@@ -70,7 +71,9 @@ export default function App() {
           <Logo size="md" />
           <h2 className="text-lg font-semibold mt-6 mb-2">Conta aguardando ativação</h2>
           <p className="text-sm text-gray-500 mb-6">
-            Seu login foi criado, mas ainda não foi liberado pelo administrador do sistema. Fale com quem administra sua conta pra ativar o acesso.
+            {user.empresas.length > 0
+              ? 'Seu login foi criado, mas ainda não foi liberado pelo administrador da sua empresa. Fale com ele pra ativar o acesso.'
+              : `Seu login foi criado, mas ainda não está em nenhuma empresa. Peça ao administrador da sua empresa pra adicionar o e-mail ${user.email}.`}
           </p>
           <button onClick={sair} className="btn btn-ghost">Sair</button>
         </div>
@@ -103,6 +106,19 @@ export default function App() {
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              {/* Empresa aberta. Quem é de mais de uma troca aqui. */}
+              {empresasLiberadas.length > 1 ? (
+                <select
+                  aria-label="Empresa aberta"
+                  value={user.empresaId || ''}
+                  onChange={e => trocarEmpresa(e.target.value)}
+                  className="text-sm p-1.5 rounded max-w-[12rem] truncate"
+                >
+                  {empresasLiberadas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                </select>
+              ) : user.empresaNome ? (
+                <span className="text-sm font-medium text-gray-700 hidden md:inline truncate max-w-[14rem]">{user.empresaNome}</span>
+              ) : null}
               <div className="flex items-center gap-2.5 min-w-0">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
