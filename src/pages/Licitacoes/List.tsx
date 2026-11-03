@@ -7,6 +7,7 @@ import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import { DateInputBR } from '../../components/DateTimeBR'
 import StatusBadge from '../../components/StatusBadge'
+import RascunhosRadar from '../../components/RascunhosRadar'
 
 const FILTROS_VAZIOS = { codigo: '', contratante: '', numeroPregao: '', numeroProcesso: '', portal: '', tipoObjeto: '', tipoDisputa: '', status: '', hasAta: 'any', q: '' }
 
@@ -136,6 +137,8 @@ export default function ListLicitacoes() {
       </div>
 
       {erro && <p role="alert" className="text-sm mb-3" style={{ color: 'var(--color-error-text)' }}>{erro}</p>}
+
+      <RascunhosRadar />
 
       <div className="bg-white p-4 rounded shadow mb-4">
         <h4 className="font-semibold mb-2">Filtros</h4>

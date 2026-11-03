@@ -7,7 +7,7 @@ import ItemsImportModal from '../../components/ItemsImportModal'
 import { nowInBrasilia } from '../../utils/date'
 import { DateInputBR, TimeInputBR } from '../../components/DateTimeBR'
 import { listContratantes } from '../../utils/contratantes'
-import { getLicitacao, createLicitacao, updateLicitacao, previewNextCodigo } from '../../utils/licitacoes'
+import { getLicitacao, createLicitacao, updateLicitacao, previewNextCodigo, getRascunho, confirmarRascunho } from '../../utils/licitacoes'
 import { auditLog } from '../../utils/audit'
 
 type Licitacao = {
@@ -42,6 +42,8 @@ export default function FormLicitacao() {
   const location = useLocation()
   const [modelo, setModelo] = useState<Licitacao>({ codigo: 0, ano: new Date().getFullYear() })
   const [isEditing, setIsEditing] = useState(false)
+  // Rascunho do Radar sendo completado: o id do processo (ainda sem código).
+  const [rascunhoId, setRascunhoId] = useState<string | null>(null)
   const [selectedContratante, setSelectedContratante] = useState<any>(null)
   const [contratanteFocused, setContratanteFocused] = useState(false)
   const [showAttachmentsModal, setShowAttachmentsModal] = useState(false)
@@ -70,6 +72,7 @@ export default function FormLicitacao() {
     const init = async () => {
       const params = new URLSearchParams(location.search)
       const edit = params.get('edit')
+      const rascunho = params.get('rascunho')
       // load contratantes
       try {
         const cs = await listContratantes()
@@ -88,6 +91,19 @@ export default function FormLicitacao() {
       const { date, time } = nowInBrasilia()
       const codigo = await previewNextCodigo()
       if (!mounted) return
+      if (rascunho) {
+        // Vem preenchido com o que o PNCP tem (objeto, órgão, número, data);
+        // a pessoa completa o resto e o código só sai ao salvar.
+        const found = await getRascunho(rascunho)
+        if (!mounted) return
+        if (found) {
+          setModelo({ ...found, codigo, ano: found.ano || new Date().getFullYear(), contratado: found.contratante?.nome || '', dataCredenciamento: date, horaCredenciamento: time })
+          if (found.contratante?.nome) setSelectedContratante(found.contratante)
+          setRascunhoId(rascunho)
+          return
+        }
+        setErroSalvar('Esse rascunho não existe mais (já foi cadastrado ou removido).')
+      }
       setModelo(m => ({ ...m, codigo, dataCredenciamento: date, horaCredenciamento: time }))
     }
     init()
@@ -107,10 +123,12 @@ export default function FormLicitacao() {
     // sem isto, salvar com o Supabase fora do ar não navegava e não dizia nada,
     // e o usuário ficava clicando em Salvar achando que o botão travou.
     try {
-      const saved = isEditing ? await updateLicitacao(modelo.codigo, record) : await createLicitacao(record)
+      const saved = isEditing ? await updateLicitacao(modelo.codigo, record)
+        : rascunhoId ? await confirmarRascunho(rascunhoId, record)
+        : await createLicitacao(record)
       try {
         const userName = localStorage.getItem('user_name') || undefined
-        await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: saved.codigo }, userName)
+        await auditLog(isEditing ? 'licitacao_update' : 'licitacao_create', { codigo: saved.codigo, ...(rascunhoId ? { doRadar: true } : {}) }, userName)
       } catch { /* auditoria nunca trava o salvamento */ }
       nav('/licitacoes')
     } catch (err: any) {
@@ -128,7 +146,10 @@ export default function FormLicitacao() {
 
   return (
     <div className="bg-white p-4 sm:p-6 rounded shadow max-w-5xl mx-auto">
-      <h3 className="text-xl font-semibold mb-4">{isEditing ? `Editar Licitação ${modelo.codigo}` : 'Nova Licitação'}</h3>
+      <h3 className="text-xl font-semibold mb-4">{isEditing ? `Editar Licitação ${modelo.codigo}` : rascunhoId ? 'Cadastrar licitação do Radar' : 'Nova Licitação'}</h3>
+      {rascunhoId && (
+        <p className="text-sm text-gray-600 -mt-2 mb-4">Já vem com o que o PNCP informa. Confira no edital, complete o resto e salve: a licitação ganha o próximo código da empresa e sai dos rascunhos.</p>
+      )}
       <form onSubmit={save} className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div>

@@ -64,3 +64,23 @@ export function IconFechar() {
     </svg>
   )
 }
+
+export function IconRadar() {
+  return (
+    <svg {...base}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <path d="M12 12l6-6" />
+      <circle cx="12" cy="12" r="1" />
+    </svg>
+  )
+}
+
+export function IconSino() {
+  return (
+    <svg {...base}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7" />
+      <path d="M10.3 20a2 2 0 0 0 3.4 0" />
+    </svg>
+  )
+}

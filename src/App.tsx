@@ -4,7 +4,8 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AdminRoute } from './components/AdminRoute'
 import { useAuth } from './context/AuthContext'
 import Logo from './components/Logo'
-import { IconLicitacoes, IconRelatorios, IconEmpresa, IconUsuarios, IconMenu, IconFechar } from './components/NavIcons'
+import { IconLicitacoes, IconRelatorios, IconEmpresa, IconUsuarios, IconMenu, IconFechar, IconRadar } from './components/NavIcons'
+import SinoAlertas from './components/SinoAlertas'
 
 // Cada página vira um chunk próprio, baixado só quando a rota é visitada —
 // sem isso, jsPDF/html2canvas/xlsx (usados só em algumas telas) entravam
@@ -19,6 +20,7 @@ const RelatoriosIndex = lazy(() => import('./pages/Relatorios/Index'))
 const Users = lazy(() => import('./pages/Users'))
 const CompanyInfo = lazy(() => import('./pages/CompanyInfo'))
 const AdminAudit = lazy(() => import('./pages/AdminAudit'))
+const Radar = lazy(() => import('./pages/Radar'))
 
 function NavItem({ to, icon, children, onClick }: { to: string; icon: React.ReactNode; children: React.ReactNode; onClick?: () => void }) {
   return (
@@ -96,6 +98,7 @@ export default function App() {
               </Link>
               <div className="hidden lg:flex items-center gap-1">
                 <NavItem to="/licitacoes" icon={<IconLicitacoes />}>Licitações</NavItem>
+                <NavItem to="/radar" icon={<IconRadar />}>Radar</NavItem>
                 <NavItem to="/relatorios" icon={<IconRelatorios />}>Relatórios</NavItem>
                 {user?.role === 'admin' && (
                   <NavItem to="/empresa" icon={<IconEmpresa />}>Informações da Empresa</NavItem>
@@ -119,6 +122,7 @@ export default function App() {
               ) : user.empresaNome ? (
                 <span className="text-sm font-medium text-gray-700 hidden md:inline truncate max-w-[14rem]">{user.empresaNome}</span>
               ) : null}
+              {user.empresaId && <SinoAlertas />}
               <div className="flex items-center gap-2.5 min-w-0">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
@@ -147,6 +151,7 @@ export default function App() {
             <div className="lg:hidden border-t border-gray-100">
               <div className="container-fixed py-2 flex flex-col gap-0.5">
                 <NavItem to="/licitacoes" icon={<IconLicitacoes />} onClick={() => setMenuAberto(false)}>Licitações</NavItem>
+                <NavItem to="/radar" icon={<IconRadar />} onClick={() => setMenuAberto(false)}>Radar</NavItem>
                 <NavItem to="/relatorios" icon={<IconRelatorios />} onClick={() => setMenuAberto(false)}>Relatórios</NavItem>
                 {user?.role === 'admin' && (
                   <NavItem to="/empresa" icon={<IconEmpresa />} onClick={() => setMenuAberto(false)}>Informações da Empresa</NavItem>
@@ -172,6 +177,7 @@ export default function App() {
             <Route path="/licitacoes" element={<ProtectedRoute><ListLicitacoes /></ProtectedRoute>} />
             <Route path="/licitacoes/novo" element={<ProtectedRoute><FormLicitacao /></ProtectedRoute>} />
             <Route path="/licitacoes/:codigo" element={<ProtectedRoute><DetailLicitacao /></ProtectedRoute>} />
+            <Route path="/radar" element={<ProtectedRoute><Radar /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><RelatoriosIndex /></ProtectedRoute>} />
             <Route path="/empresa" element={<AdminRoute><CompanyInfo /></AdminRoute>} />
             <Route path="/users" element={<AdminRoute roles={['admin', 'moderador']}><Users /></AdminRoute>} />

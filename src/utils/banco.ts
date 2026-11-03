@@ -181,6 +181,10 @@ export async function codigosPorId(codigos: (number | string)[]): Promise<Record
 export const MAPA_PROCESSO: Mapa = {
   campos: {
     codigo: { banco: 'numero', soLeitura: true },
+    // Rascunho criado pelo Acompanhar do Radar (migração 0014): ainda sem código.
+    processoId: { banco: 'id', soLeitura: true },
+    rascunho: { banco: 'rascunho', soLeitura: true },
+    numeroControlePncp: { banco: 'numero_controle_pncp', soLeitura: true },
     ano: 'ano',
     contratado: 'contratado',
     contratante: 'orgao',
