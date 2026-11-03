@@ -10,6 +10,7 @@ import { listContratantes } from '../../utils/contratantes'
 import { getLicitacao, createLicitacao, updateLicitacao, previewNextCodigo, getRascunho, confirmarRascunho } from '../../utils/licitacoes'
 import { auditLog } from '../../utils/audit'
 import { replaceItems } from '../../utils/items'
+import { baixarPlanilhaItens } from '../../utils/modelo-cotacao'
 import { itensDoPncp, juntarItens, lerEditalDoRascunho, pedirLeituraEdital, preencherDoEdital, type EditalDoRascunho, type ItemCadastro, type Origem } from '../../utils/edital'
 
 type Leitura = { estado: 'lendo' | 'pronto' | 'sem_ia' | 'teto' | 'falhou' | 'erro'; avisos?: string[]; msg?: string }
@@ -167,6 +168,16 @@ export default function FormLicitacao() {
   }, [numeroPncp])
 
   const itensDoPncpValem = Boolean(itensPncp && itensPncp.length)
+  // Bloco do pregão no topo da planilha de itens que a pessoa baixa.
+  const mod: any = modelo
+  const cabecalhoPregao = {
+    orgao: selectedContratante?.nome || mod.contratado || '',
+    pregao: [mod.numeroPregao, mod.ano].filter(Boolean).join('/'),
+    processo: mod.numeroProcesso || '',
+    objeto: mod.objetoLicitacao || '',
+    data: mod.dataLicitacao ? String(mod.dataLicitacao).split('-').reverse().join('/') : '',
+  }
+
   const itensEdital = useMemo(
     () => (itensDoPncpValem ? juntarItens(itensPncp!, itensIa) : itensIa),
     [itensPncp, itensIa, itensDoPncpValem],
@@ -513,9 +524,15 @@ export default function FormLicitacao() {
                 </tbody>
               </table>
             </div>
-            <label className="flex items-center gap-2 mt-2 text-sm">
-              <input type="checkbox" checked={salvarItens} onChange={e => setSalvarItens(e.target.checked)} /> Salvar estes itens junto com a licitação
-            </label>
+            <div className="flex flex-wrap items-center gap-3 mt-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={salvarItens} onChange={e => setSalvarItens(e.target.checked)} /> Salvar estes itens junto com a licitação
+              </label>
+              <button type="button" className="btn btn-ghost ml-auto" onClick={() => baixarPlanilhaItens(itensEdital, cabecalhoPregao)}>
+                ⬇ Baixar planilha de itens
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">A planilha vem no modelo de cotação: complete no Excel e depois use "Importar Itens" para trazer de volta.</p>
           </div>
         )}
 
@@ -534,7 +551,7 @@ export default function FormLicitacao() {
         </div>
       </form>
       <AttachmentsModal open={showAttachmentsModal} onClose={() => setShowAttachmentsModal(false)} codigo={modelo.codigo} />
-      <ItemsImportModal open={showItemsImportModal} onClose={() => setShowItemsImportModal(false)} codigo={modelo.codigo} />
+      <ItemsImportModal open={showItemsImportModal} onClose={() => setShowItemsImportModal(false)} codigo={modelo.codigo} cabecalho={cabecalhoPregao} />
       <ContractorModal open={showContractorModal} onClose={async () => {
         setShowContractorModal(false)
         try {
