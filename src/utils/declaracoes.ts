@@ -227,14 +227,26 @@ export function bancoDaLicitacao(empresa: any, licitacao: any): { id: string; ap
   return bancos.find(b => b.id === licitacao?.bancoId) || bancos[0]
 }
 
+// Palavras que mostram que o nome já é de um órgão ("Universidade Estadual de Londrina",
+// "Município de Curitiba", "Secretaria de Saúde"...). Sem nenhuma delas, o nome é só a cidade
+// (como no cadastro antigo) e o documento vai para a prefeitura.
+const PALAVRAS_DE_ORGAO = /\b(PREFEITURA|MUNICIPIO|CAMARA|ESTADO|GOVERNO|SECRETARIA|UNIVERSIDADE|INSTITUTO|FUNDACAO|FUNDO|HOSPITAL|CONSORCIO|AUTARQUIA|TRIBUNAL|MINISTERIO|DEPARTAMENTO|SERVICO|EMPRESA|COMPANHIA|AGENCIA|COMANDO|EXERCITO|MARINHA|AERONAUTICA|POLICIA|ASSEMBLEIA|CONSELHO|SUPERINTENDENCIA|DIRETORIA|CENTRO|COORDENADORIA|DEFENSORIA|PROCURADORIA|UNIDADE|INSTITUICAO|FACULDADE|COLEGIO|ESCOLA|BANCO|CAIXA|EMBRAPA|SAMAE|SANEAMENTO|COMPANHIA)\b/
+
+/** Para quem vai o documento: o nome do órgão como veio, ou "PREFEITURA MUNICIPAL DE <cidade>". */
+export function destinatario(nome: unknown, uf: unknown): string {
+  const texto = String(nome ?? '').trim().toUpperCase()
+  if (!texto) return ''
+  const sufixoUf = String(uf ?? '').trim() ? '/' + String(uf).trim().toUpperCase() : ''
+  const semAcento = texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return PALAVRAS_DE_ORGAO.test(semAcento) ? `${texto}${sufixoUf}` : `PREFEITURA MUNICIPAL DE ${texto}${sufixoUf}`
+}
+
 export function buildDeclaracaoContext(empresa: any, licitacao: any): DeclaracaoContext {
   empresa = empresa || {}
   licitacao = licitacao || {}
   const contratanteNome = licitacao.contratante?.nome || licitacao.contratado || ''
   const contratanteUf = licitacao.contratante?.uf || ''
-  const contratanteCompleto = contratanteNome
-    ? `PREFEITURA MUNICIPAL DE ${String(contratanteNome).toUpperCase()}${contratanteUf ? '/' + String(contratanteUf).toUpperCase() : ''}`
-    : ''
+  const contratanteCompleto = destinatario(contratanteNome, contratanteUf)
   const banco = bancoDaLicitacao(empresa, licitacao)
   return {
     razaoSocial: empresa.razaoSocial || '',

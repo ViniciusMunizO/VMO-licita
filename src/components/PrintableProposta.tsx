@@ -102,7 +102,7 @@ export default function PrintableProposta({ modelo, items, empresa, pageRef }: P
                       <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f7f7fc' }}>
                         {colunas.map(c => {
                           const value = it[c.key]
-                          const display = c.numeric ? formatNumeric(value) : (value === undefined || value === '' ? '-' : String(value))
+                          const display = c.numeric ? formatNumeric(value) : (value === undefined || value === null || String(value).trim() === '' || value === 'null' ? '-' : String(value))
                           return (
                             <td key={c.key} style={{ padding: '6px 6px', borderBottom: '1px solid #eee', textAlign: c.numeric ? 'right' : 'left', verticalAlign: 'top' }}>{display}</td>
                           )

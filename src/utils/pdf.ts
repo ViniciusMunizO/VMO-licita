@@ -3,6 +3,7 @@ import jsPDF from 'jspdf'
 import { carregarConfigEmpresa } from './config-empresa'
 import { urlAssinada } from './arquivo'
 import { medidaNoPdf } from './logo'
+import { alturaDaFatia } from './paginas'
 
 // A logo é a da empresa aberta (Informações da Empresa → Logo), guardada no Storage.
 // Entra no PDF como imagem, então precisa virar base64; carregamos uma vez por arquivo.
@@ -60,6 +61,28 @@ function hexToRgb(hex: string) {
   return { r, g, b }
 }
 
+// Uma linha de pixels "sem tinta" não tem nada escuro (texto, número, linha preta): só fundo,
+// listra clara da tabela ou borda cinza-clara. É onde dá para virar a página sem cortar letra.
+const TINTA = 170 // luminância (0-255) abaixo da qual o pixel conta como tinta
+function linhaSemTinta(canvas: HTMLCanvasElement): (y: number) => boolean {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return () => false
+  const largura = canvas.width
+  const cache = new Map<number, boolean>()
+  return (y: number) => {
+    const guardado = cache.get(y)
+    if (guardado !== undefined) return guardado
+    const d = ctx.getImageData(0, y, largura, 1).data
+    let vazia = true
+    for (let i = 0; i < d.length; i += 4) {
+      if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < TINTA) { vazia = false; break }
+    }
+    cache.set(y, vazia)
+    return vazia
+  }
+}
+
+
 // Recorta uma faixa horizontal do canvas de origem (em pixels do canvas) para
 // um canvas novo — usado para dividir um elemento alto em várias páginas de
 // PDF, em vez de espremer o conteúdo inteiro numa página só.
@@ -88,7 +111,9 @@ export async function exportElementsToPdf(
   // CLIENTE, não a paleta do sistema — o documento é dele e vai assinado por
   // ele. Ao trocar a logo do cliente, ajustar esta cor junto.
   const primary = '#0F1B3D'
-  const availableH = pdfPageHeight - headerHeight - footerHeight
+  // O conteúdo começa 8 pt abaixo do filete do cabeçalho e para 8 pt antes do rodapé.
+  const MARGEM_CONTEUDO = 8
+  const availableH = pdfPageHeight - headerHeight - footerHeight - 2 * MARGEM_CONTEUDO
 
   let pageIndex = 0
   let firstPage = true
@@ -137,7 +162,7 @@ export async function exportElementsToPdf(
     if (!firstPage) pdf.addPage()
     firstPage = false
     drawHeaderFooter()
-    pdf.addImage(dataUrl, 'JPEG', 0, headerHeight + 8, pdfWidth, renderedHeight)
+    pdf.addImage(dataUrl, 'JPEG', 0, headerHeight + MARGEM_CONTEUDO, pdfWidth, renderedHeight)
   }
 
   for (const el of elements) {
@@ -156,13 +181,14 @@ export async function exportElementsToPdf(
     // Conteúdo mais alto que uma página: em vez de encolher tudo pra caber
     // numa página só (o que deixava relatórios longos ilegíveis), fatia o
     // canvas em pedaços do tamanho de uma página e continua em páginas
-    // seguintes — o corte pode cair no meio de uma linha da tabela, mas o
-    // texto continua no tamanho normal, legível.
+    // seguintes. O corte sobe até a última faixa sem texto (entre duas linhas
+    // da tabela ou do parágrafo), para nenhuma linha sair partida ao meio.
     const pxPorPt = canvas.width / pdfWidth
     const alturaFatiaPx = Math.max(1, Math.floor(availableH * pxPorPt))
+    const semTinta = linhaSemTinta(canvas)
     let sy = 0
     while (sy < canvas.height) {
-      const alturaEstaFatia = Math.min(alturaFatiaPx, canvas.height - sy)
+      const alturaEstaFatia = alturaDaFatia(sy, alturaFatiaPx, canvas.height, semTinta)
       const fatia = fatiarCanvas(canvas, sy, alturaEstaFatia)
       const alturaRenderizada = (alturaEstaFatia * pdfWidth) / canvas.width
       addImagePage(fatia.toDataURL('image/jpeg', JPEG_QUALITY), alturaRenderizada)
