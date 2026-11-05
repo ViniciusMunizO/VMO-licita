@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getEmpresaInfo } from './empresa'
 import { empresaGuardada } from './banco'
+import { itensDaEmpresa } from './habilitacao'
 
 // Configurações que mudam de uma empresa para outra (tabela empresa_dados, migração 0013).
 // Antes eram fixas para um cliente só ("Kralen", "Medicamentos/Materiais"). Sem valor salvo,
@@ -10,6 +11,8 @@ export type ConfigEmpresa = {
   /** Nome do sistema interno (ERP) onde a empresa lança as licitações ganhas. */
   sistema: string
   tiposObjeto: string[]
+  /** Itens da checklist de habilitação das licitações (habilitacao.ts). */
+  itensHabilitacao: string[]
   /** Logo da empresa no Storage (pasta da empresa), usada nos PDFs. Sem logo, o PDF sai só com o título. */
   logoCaminho: string | null
 }
@@ -25,6 +28,7 @@ export function configDe(info: Record<string, any> | null | undefined): ConfigEm
   return {
     sistema: sistema || SISTEMA_PADRAO,
     tiposObjeto: tipos.length ? tipos : TIPOS_OBJETO_PADRAO,
+    itensHabilitacao: itensDaEmpresa(info),
     logoCaminho: String(info?.logoCaminho ?? '').trim() || null,
   }
 }

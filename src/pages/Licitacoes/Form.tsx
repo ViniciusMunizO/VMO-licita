@@ -12,6 +12,7 @@ import { auditLog } from '../../utils/audit'
 import { replaceItems } from '../../utils/items'
 import { baixarPlanilhaItens } from '../../utils/modelo-cotacao'
 import { carregarConfigEmpresa, opcoesTipoObjeto, useConfigEmpresa } from '../../utils/config-empresa'
+import { itensDaLicitacao } from '../../utils/habilitacao'
 import { itensDoPncp, juntarItens, lerEditalDoRascunho, pedirLeituraEdital, preencherDoEdital, type EditalDoRascunho, type ItemCadastro, type Origem } from '../../utils/edital'
 
 type Leitura = { estado: 'lendo' | 'pronto' | 'sem_ia' | 'teto' | 'falhou' | 'erro'; avisos?: string[]; msg?: string }
@@ -57,7 +58,7 @@ export default function FormLicitacao() {
   const { user } = useAuth()
   const nav = useNavigate()
   const location = useLocation()
-  const { tiposObjeto } = useConfigEmpresa()
+  const { tiposObjeto, itensHabilitacao } = useConfigEmpresa()
   const [modelo, setModelo] = useState<Licitacao>({ codigo: 0, ano: new Date().getFullYear() })
   const [isEditing, setIsEditing] = useState(false)
   // Rascunho do Radar sendo completado: o id do processo (ainda sem código).
@@ -80,16 +81,8 @@ export default function FormLicitacao() {
   const [salvando, setSalvando] = useState(false)
   const [erroSalvar, setErroSalvar] = useState('')
   const [contratantes, setContratantes] = useState<any[]>([])
+  // Os itens marcados entram aqui pela chave (habilitacao.ts); a lista vem da empresa.
   const [habilitacao, setHabilitacao] = useState<any>({
-    habilitacaoJuridica: false,
-    habilitacaoFiscal: false,
-    balanco: false,
-    anvisa: false,
-    boasPraticas: false,
-    laudo: false,
-    bula: false,
-    ggrem: false,
-    cti: false,
     outras: false,
     outrasTexto: '',
     observacaoInterna: ''
@@ -139,18 +132,15 @@ export default function FormLicitacao() {
   }, [])
 
   // Só preenche o que está vazio: nunca apaga o que a pessoa já digitou.
+  // A configuração da empresa decide os itens da checklist e os tipos de objeto aceitos.
   const aplicarEdital = (e: EditalDoRascunho) => {
-    const p = preencherDoEdital(e)
+    carregarConfigEmpresa().then(c => aplicarPreenchimento(e, preencherDoEdital(e, c.itensHabilitacao), c.tiposObjeto))
+  }
+  const aplicarPreenchimento = (e: EditalDoRascunho, p: ReturnType<typeof preencherDoEdital>, tiposDaEmpresa: string[]) => {
     // A sugestão de tipo (Medicamentos/Materiais/Misto) só entra se for uma das opções da empresa.
-    const tipoSugerido = p.campos.tipoObjeto
-    if (tipoSugerido) {
+    if (p.campos.tipoObjeto && !tiposDaEmpresa.includes(p.campos.tipoObjeto)) {
       delete p.campos.tipoObjeto
       delete p.origem.tipoObjeto
-      carregarConfigEmpresa().then(c => {
-        if (!c.tiposObjeto.includes(String(tipoSugerido))) return
-        setModelo((m: any) => (m.tipoObjeto ? m : { ...m, tipoObjeto: tipoSugerido }))
-        setOrigem(o => (o.tipoObjeto ? o : { ...o, tipoObjeto: { fonte: 'sugestao' } }))
-      })
     }
     setModelo(m => {
       const n: any = { ...m }
@@ -491,15 +481,9 @@ export default function FormLicitacao() {
           <h4 className="font-semibold mb-2">Habilitação (Checklist)</h4>
           {origem.habilitacao && <p className="mb-2">{marca('habilitacao')}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.habilitacaoJuridica} onChange={e => setHabilitacao({ ...habilitacao, habilitacaoJuridica: e.target.checked })} /> Habilitação Jurídica</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.habilitacaoFiscal} onChange={e => setHabilitacao({ ...habilitacao, habilitacaoFiscal: e.target.checked })} /> Habilitação Fiscal, Social e Trabalhista</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.balanco} onChange={e => setHabilitacao({ ...habilitacao, balanco: e.target.checked })} /> Balanço</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.anvisa} onChange={e => setHabilitacao({ ...habilitacao, anvisa: e.target.checked })} /> Anvisa</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.boasPraticas} onChange={e => setHabilitacao({ ...habilitacao, boasPraticas: e.target.checked })} /> Boas Práticas</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.laudo} onChange={e => setHabilitacao({ ...habilitacao, laudo: e.target.checked })} /> Laudo</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.bula} onChange={e => setHabilitacao({ ...habilitacao, bula: e.target.checked })} /> Bula</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.ggrem} onChange={e => setHabilitacao({ ...habilitacao, ggrem: e.target.checked })} /> GGREM</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.cti} onChange={e => setHabilitacao({ ...habilitacao, cti: e.target.checked })} /> CTI com Transportadora</label>
+            {itensDaLicitacao(itensHabilitacao, habilitacao).map(({ chave, rotulo }) => (
+              <label key={chave} className="flex items-center gap-2"><input type="checkbox" checked={habilitacao[chave] === true} onChange={e => setHabilitacao({ ...habilitacao, [chave]: e.target.checked })} /> {rotulo}</label>
+            ))}
             <div>
               <label className="flex items-center gap-2"><input type="checkbox" checked={habilitacao.outras} onChange={e => setHabilitacao({ ...habilitacao, outras: e.target.checked })} /> Outras declarações</label>
               {habilitacao.outras && <textarea value={habilitacao.outrasTexto} onChange={e => setHabilitacao({ ...habilitacao, outrasTexto: e.target.value })} className="w-full p-2 rounded mt-2" placeholder="Descrever outras declarações" />}

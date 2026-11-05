@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { getEmpresaInfo } from '../utils/empresa'
+import { useConfigEmpresa } from '../utils/config-empresa'
+import { itensDaLicitacao } from '../utils/habilitacao'
 import { listItems } from '../utils/items'
 import { listAttachments } from '../utils/attachments'
 import { formatDateTimeBR } from '../utils/date'
@@ -27,18 +29,6 @@ type Props = {
 const PRIMARY = '#0F1B3D'
 const BOX_BG = '#f6f6fb'
 const BOX_BORDER = '#e4e4f0'
-
-const HABILITACAO_ITEMS: { key: string; label: string }[] = [
-  { key: 'habilitacaoJuridica', label: 'Habilitação Jurídica' },
-  { key: 'habilitacaoFiscal', label: 'Habilitação Fiscal, Social e Trabalhista' },
-  { key: 'balanco', label: 'Balanço' },
-  { key: 'anvisa', label: 'Anvisa' },
-  { key: 'boasPraticas', label: 'Boas Práticas' },
-  { key: 'laudo', label: 'Laudo' },
-  { key: 'bula', label: 'Bula' },
-  { key: 'ggrem', label: 'GGREM' },
-  { key: 'cti', label: 'CTI com Transportadora' },
-]
 
 const ITEM_COLUMNS: { key: string; label: string; width: string; fallback?: string[]; numeric?: boolean; boolean?: boolean; maxChars?: number }[] = [
   { key: 'item', label: 'Item', width: '4%' },
@@ -151,6 +141,7 @@ function ItemsTable({ items, subtotalLabel, subtotalStyle }: { items: any[]; sub
 }
 
 export default function PrintableChecklist({ modelo, codigo, user, habilitacao = {}, page1Ref, page2Ref, items: itemsProp, attachments: attachmentsProp }: Props) {
+  const { itensHabilitacao } = useConfigEmpresa()
   const [fetchedAttachments, setFetchedAttachments] = useState<any[]>([])
   const [fetchedItems, setFetchedItems] = useState<any[]>([])
   const [empresa, setEmpresa] = useState<any>(null)
@@ -240,7 +231,7 @@ export default function PrintableChecklist({ modelo, codigo, user, habilitacao =
           <div style={{ flex: 1 }}>
             <Box title="2. Habilitação">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-                {HABILITACAO_ITEMS.map(({ key, label }) => {
+                {itensDaLicitacao(itensHabilitacao, habilitacao).map(({ chave: key, rotulo: label }) => {
                   const checked = !!habilitacao?.[key]
                   return (
                     <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5 }}>

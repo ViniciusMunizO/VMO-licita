@@ -60,6 +60,7 @@ describe('preencherDoEdital', () => {
     expect(p.habilitacao).toEqual({})
   })
 
+  // Checklist de uma empresa da área de saúde (cada empresa tem a sua, ver habilitacao.test.ts).
   it('com a leitura: preenche tudo o que o edital traz, com página e trecho', () => {
     const p = preencherDoEdital({
       ...base,
@@ -87,7 +88,7 @@ describe('preencherDoEdital', () => {
           { numero: '3', descricao: '  ', quantidade: '1', unidade: 'UN', valorUnitario: '1' },
         ],
       },
-    })
+    }, ['Habilitação Jurídica', 'Habilitação Fiscal, Social e Trabalhista', 'Balanço', 'Anvisa'])
     expect(p.campos).toEqual({
       portal: 'BLL Compras', tipoDisputa: 'Aberto-Fechado', definJulgamento: 'Item', dataLimiteImpugnacao: '2026-11-10',
       prazoValidade: '60 dias', prazoEntrega: '10 dias após o empenho', localEntrega: 'Almoxarifado central',

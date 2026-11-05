@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { ITENS_HABILITACAO_PADRAO, marcarPeloEdital } from './habilitacao'
 
 // "Continuar cadastro" do Radar: o que o PNCP e a leitura do edital pela IA trazem viram
 // sugestões no formulário. Nada é salvo sem a pessoa conferir e clicar em Salvar.
@@ -119,21 +120,11 @@ export function sugerirTipoObjeto(textos: string[]): string {
   return ''
 }
 
-// Cada caixa do checklist de habilitação e as palavras que a marcam.
-const HABILITACAO: [string, RegExp][] = [
-  ['habilitacaoJuridica', /ato constitutivo|contrato social|estatuto|registro comercial|empresario individual|habilitacao juridica/],
-  ['habilitacaoFiscal', /fiscal|cnpj|fgts|trabalhista|cndt|debitos|tributo|fazenda|inss|seguridade social/],
-  ['balanco', /balanco|indices|falencia|recuperacao judicial|economico-financeira|economico financeira|patrimonio liquido/],
-  ['anvisa', /anvisa|autorizacao de funcionamento|\bafe\b|vigilancia sanitaria|licenca sanitaria|alvara sanitario|registro .{0,30}ministerio da saude/],
-  ['boasPraticas', /boas praticas|\bcbp/],
-  ['laudo', /laudo/],
-  ['bula', /\bbula/],
-  ['ggrem', /ggrem|cmed/],
-  ['cti', /transportadora|\bcti\b/],
-]
-
-/** Transforma o que veio do banco em valores para o formulário, com a origem de cada um. */
-export function preencherDoEdital(e: EditalDoRascunho): Preenchimento {
+/**
+ * Transforma o que veio do banco em valores para o formulário, com a origem de cada um.
+ * `itensHabilitacao`: a checklist da empresa (habilitacao.ts); os documentos do edital marcam esses itens.
+ */
+export function preencherDoEdital(e: EditalDoRascunho, itensHabilitacao: string[] = ITENS_HABILITACAO_PADRAO): Preenchimento {
   const campos: Record<string, string> = {}
   const origem: Record<string, Origem> = {}
   const habilitacao: Record<string, boolean | string> = {}
@@ -169,13 +160,10 @@ export function preencherDoEdital(e: EditalDoRascunho): Preenchimento {
   const tipo = sugerirTipoObjeto([r.objeto?.valor || '', ...itensEdital.map(i => i.descricao)])
   if (tipo) { campos.tipoObjeto = tipo; origem.tipoObjeto = { fonte: 'sugestao' } }
 
-  const outras: string[] = []
-  for (const d of r.documentosHabilitacao || []) {
-    const t = semAcento(d.descricao || '')
-    const caixas = HABILITACAO.filter(([, re]) => re.test(t)).map(([nome]) => nome)
-    caixas.forEach(nome => { habilitacao[nome] = true })
-    if (!caixas.length && d.descricao?.trim()) outras.push(curto(d.descricao.trim(), 200))
-  }
+  const documentos = (r.documentosHabilitacao || []).map(d => d.descricao || '')
+  const { marcados, sobras } = marcarPeloEdital(itensHabilitacao, documentos)
+  Object.assign(habilitacao, marcados)
+  const outras = sobras.map(d => curto(d, 200))
   for (const d of r.declaracoes || []) if (d.descricao?.trim()) outras.push(`Declaração: ${curto(d.descricao.trim(), 200)}`)
   if (outras.length) {
     habilitacao.outras = true

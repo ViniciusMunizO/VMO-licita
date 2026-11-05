@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { configDe, listaDeTexto, opcoesTipoObjeto, SISTEMA_PADRAO, TIPOS_OBJETO_PADRAO } from './config-empresa'
 import { filtrosSistema, passaFiltroSistema } from './filtroSistema'
+import { ITENS_HABILITACAO_PADRAO } from './habilitacao'
 
 describe('configurações da empresa', () => {
   it('sem nada salvo, usa os padrões genéricos (nada de Kralen)', () => {
-    expect(configDe(null)).toEqual({ sistema: SISTEMA_PADRAO, tiposObjeto: TIPOS_OBJETO_PADRAO, logoCaminho: null })
+    expect(configDe(null)).toEqual({ sistema: SISTEMA_PADRAO, tiposObjeto: TIPOS_OBJETO_PADRAO, itensHabilitacao: ITENS_HABILITACAO_PADRAO, logoCaminho: null })
     expect(configDe({ nomeSistemaInterno: '   ', tiposObjeto: [], logoCaminho: '' }).sistema).toBe('ERP')
   })
   it('usa o que a empresa salvou', () => {
-    const c = configDe({ nomeSistemaInterno: ' Bling ', tiposObjeto: ['Medicamentos', ' Materiais ', ''], logoCaminho: 'e1/empresa/logo/x.png' })
-    expect(c).toEqual({ sistema: 'Bling', tiposObjeto: ['Medicamentos', 'Materiais'], logoCaminho: 'e1/empresa/logo/x.png' })
+    const c = configDe({ nomeSistemaInterno: ' Bling ', tiposObjeto: ['Medicamentos', ' Materiais ', ''], itensHabilitacao: ['Anvisa', ' Laudo '], logoCaminho: 'e1/empresa/logo/x.png' })
+    expect(c).toEqual({ sistema: 'Bling', tiposObjeto: ['Medicamentos', 'Materiais'], itensHabilitacao: ['Anvisa', 'Laudo'], logoCaminho: 'e1/empresa/logo/x.png' })
   })
   it('lista digitada: separa por vírgula, ponto e vírgula ou linha, sem repetir', () => {
     expect(listaDeTexto('Medicamentos, materiais;Misto\nmedicamentos, ,')).toEqual(['Medicamentos', 'materiais', 'Misto'])

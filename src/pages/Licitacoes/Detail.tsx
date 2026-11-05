@@ -12,6 +12,7 @@ import PrintableChecklist from '../../components/PrintableChecklist'
 import PrintableProposta from '../../components/PrintableProposta'
 import { marcarLancadoNoSistema } from '../../utils/lancamento'
 import { useConfigEmpresa } from '../../utils/config-empresa'
+import { itensDaLicitacao } from '../../utils/habilitacao'
 import { getLicitacao, updateLicitacao } from '../../utils/licitacoes'
 import { listItems, updateItem, buscarHistoricoPrecoItem, HistoricoPrecoItem } from '../../utils/items'
 import { MOTIVOS_DESCLASSIFICACAO, PREFIXO_OUTRO, parseMotivo, formatMotivo } from '../../utils/itens'
@@ -34,19 +35,6 @@ const MOTIVO_MAX_LENGTH = 500
 // campo deixe digitar mais do que cabe e o `saveMotivo` corte o final do
 // texto em silêncio na hora de gravar.
 const DETALHE_OUTRO_MAX_LENGTH = MOTIVO_MAX_LENGTH - PREFIXO_OUTRO.length
-
-const HABILITACAO_ITEMS: { key: string; label: string }[] = [
-  { key: 'habilitacaoJuridica', label: 'Habilitação Jurídica' },
-  { key: 'habilitacaoFiscal', label: 'Habilitação Fiscal, Social e Trabalhista' },
-  { key: 'balanco', label: 'Balanço' },
-  { key: 'anvisa', label: 'Anvisa' },
-  { key: 'boasPraticas', label: 'Boas Práticas' },
-  { key: 'laudo', label: 'Laudo' },
-  { key: 'bula', label: 'Bula' },
-  { key: 'ggrem', label: 'GGREM' },
-  { key: 'cti', label: 'CTI com Transportadora' },
-  { key: 'outras', label: 'Outras declarações' },
-]
 
 // Imprime o conteúdo (já todo em estilo inline, sem depender do CSS do app) por um quadro
 // escondido na própria página. Antes abria uma janela nova, e o navegador que bloqueia
@@ -90,7 +78,7 @@ const ITEM_FIELDS: { key: string; label: string; wide?: boolean }[] = [
 export default function DetailLicitacao() {
   const { codigo } = useParams()
   const nav = useNavigate()
-  const { sistema } = useConfigEmpresa()
+  const { sistema, itensHabilitacao } = useConfigEmpresa()
   const [model, setModel] = useState<any>(null)
   const [attachments, setAttachments] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
@@ -519,7 +507,7 @@ export default function DetailLicitacao() {
         {model.habilitacao ? (
           <>
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-              {HABILITACAO_ITEMS.map(({ key, label }) => {
+              {[...itensDaLicitacao(itensHabilitacao, model.habilitacao), { chave: 'outras', rotulo: 'Outras declarações' }].map(({ chave: key, rotulo: label }) => {
                 const checked = !!model.habilitacao[key]
                 return (
                   <div key={key} className="flex items-center gap-2 text-sm">

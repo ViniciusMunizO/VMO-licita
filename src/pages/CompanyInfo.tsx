@@ -6,6 +6,7 @@ import DocumentosEmpresaSection from '../components/DocumentosEmpresaSection'
 import { uploadAnexo, urlAssinada } from '../utils/arquivo'
 import { avisosDaLogo, LOGO_ORIENTACAO, medidaNoPdf } from '../utils/logo'
 import { configEmpresaMudou, listaDeTexto, SISTEMA_PADRAO, TIPOS_OBJETO_PADRAO } from '../utils/config-empresa'
+import { itensDaEmpresa, itensDeTexto, ITENS_HABILITACAO_PADRAO, MAX_ITENS_HABILITACAO } from '../utils/habilitacao'
 
 type BancoConta = {
   id: string
@@ -34,6 +35,7 @@ type EmpresaInfo = {
   declaracoesProposta: string
   nomeSistemaInterno: string
   tiposObjeto: string[]
+  itensHabilitacao: string[]
   logoCaminho: string | null
 }
 
@@ -45,6 +47,7 @@ const empty: EmpresaInfo = {
   declaracoesProposta: '',
   nomeSistemaInterno: '',
   tiposObjeto: TIPOS_OBJETO_PADRAO,
+  itensHabilitacao: ITENS_HABILITACAO_PADRAO,
   logoCaminho: null,
 }
 
@@ -95,6 +98,8 @@ export default function CompanyInfo() {
   const [enviandoLogo, setEnviandoLogo] = useState(false)
   const [avisosLogo, setAvisosLogo] = useState<string[]>([])
   const [tiposTexto, setTiposTexto] = useState(TIPOS_OBJETO_PADRAO.join(", "))
+  // Um item por linha: o nome de um item pode ter vírgula ("Habilitação Fiscal, Social e Trabalhista").
+  const [habilitacaoTexto, setHabilitacaoTexto] = useState(ITENS_HABILITACAO_PADRAO.join('\n'))
 
   useEffect(() => {
     let mounted = true
@@ -106,6 +111,7 @@ export default function CompanyInfo() {
       const carregado = { ...empty, ...semNulos }
       setForm(carregado)
       setTiposTexto((carregado.tiposObjeto?.length ? carregado.tiposObjeto : TIPOS_OBJETO_PADRAO).join(", "))
+      setHabilitacaoTexto(itensDaEmpresa(carregado).join('\n'))
       setLoading(false)
     })
     return () => { mounted = false }
@@ -147,9 +153,16 @@ export default function CompanyInfo() {
     setSalvando(true)
     try {
       const tipos = listaDeTexto(tiposTexto)
-      const salvo = await saveEmpresaInfo({ ...form, nomeSistemaInterno: form.nomeSistemaInterno.trim(), tiposObjeto: tipos.length ? tipos : TIPOS_OBJETO_PADRAO })
+      const itens = itensDeTexto(habilitacaoTexto)
+      const salvo = await saveEmpresaInfo({
+        ...form,
+        nomeSistemaInterno: form.nomeSistemaInterno.trim(),
+        tiposObjeto: tipos.length ? tipos : TIPOS_OBJETO_PADRAO,
+        itensHabilitacao: itens.length ? itens : ITENS_HABILITACAO_PADRAO,
+      })
       configEmpresaMudou(salvo)
       setTiposTexto((salvo.tiposObjeto?.length ? salvo.tiposObjeto : TIPOS_OBJETO_PADRAO).join(", "))
+      setHabilitacaoTexto(itensDaEmpresa(salvo).join('\n'))
       setSavedAt(Date.now())
     } catch (err: any) {
       setErro(err?.message || 'Não foi possível salvar as informações da empresa.')
@@ -235,6 +248,16 @@ export default function CompanyInfo() {
                 placeholder={TIPOS_OBJETO_PADRAO.join(', ')} className="w-full p-2 rounded" />
               <p className="text-xs text-gray-500 mt-1">As opções do campo "Tipo Objeto" da licitação. Ex.: Medicamentos, Materiais, Misto.</p>
             </div>
+          </div>
+          <div className="mt-4">
+            <label htmlFor="emp-habilitacao" className="block text-sm text-gray-600">Itens da checklist de habilitação (um por linha)</label>
+            <textarea id="emp-habilitacao" value={habilitacaoTexto} onChange={e => setHabilitacaoTexto(e.target.value)} rows={6}
+              placeholder={ITENS_HABILITACAO_PADRAO.join('\n')} className="w-full p-2 rounded" />
+            <p className="text-xs text-gray-500 mt-1">
+              Aparecem como caixas de marcar em cada licitação e na checklist impressa. Até {MAX_ITENS_HABILITACAO} itens.
+              Ex.: Anvisa, Atestado de capacidade técnica, Registro no CREA. Ao ler o edital, a IA sugere quais marcar.
+              Tirar um item daqui não apaga o que já foi marcado nas licitações antigas.
+            </p>
           </div>
           <div className="mt-4">
             <span className="block text-sm text-gray-600">Logo da empresa (sai no topo da Proposta e dos PDFs)</span>
