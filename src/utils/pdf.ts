@@ -2,6 +2,7 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { carregarConfigEmpresa } from './config-empresa'
 import { urlAssinada } from './arquivo'
+import { medidaNoPdf } from './logo'
 
 // A logo é a da empresa aberta (Informações da Empresa → Logo), guardada no Storage.
 // Entra no PDF como imagem, então precisa virar base64; carregamos uma vez por arquivo.
@@ -96,14 +97,14 @@ export async function exportElementsToPdf(
   // documento — nada de marca do sistema. Fundo claro de propósito: a logo é
   // azul-marinho sobre transparente, então sumiria num cabeçalho escuro.
   const logo = await carregarLogo()
-  const logoAltura = 28
-  const logoLargura = logo ? logoAltura * logo.aspecto : 0
+  // Altura fixa (~1 cm) e largura pela proporção, até ~6 cm para não encostar no título (logo.ts).
+  const { largura: logoLargura, altura: logoAltura } = logo ? medidaNoPdf(logo.aspecto) : { largura: 0, altura: 0 }
 
   const drawHeaderFooter = () => {
     pageIndex += 1
     const rgb = hexToRgb(primary)
 
-    if (logo) {
+    if (logo && logoLargura > 0) {
       pdf.addImage(logo.dataUrl, 'JPEG', 12, (headerHeight - logoAltura) / 2, logoLargura, logoAltura)
     }
 

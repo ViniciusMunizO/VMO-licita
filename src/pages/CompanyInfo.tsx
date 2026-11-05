@@ -4,6 +4,7 @@ import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
 import { confirmarRemocao } from '../utils/confirmar'
 import DocumentosEmpresaSection from '../components/DocumentosEmpresaSection'
 import { uploadAnexo, urlAssinada } from '../utils/arquivo'
+import { avisosDaLogo, LOGO_ORIENTACAO, medidaNoPdf } from '../utils/logo'
 import { configEmpresaMudou, listaDeTexto, SISTEMA_PADRAO, TIPOS_OBJETO_PADRAO } from '../utils/config-empresa'
 
 type BancoConta = {
@@ -50,6 +51,21 @@ const empty: EmpresaInfo = {
 const LOGO_MAX_BYTES = 2 * 1024 * 1024
 const LOGO_TIPOS = ['image/png', 'image/jpeg', 'image/webp']
 
+// Largura e altura em pixels, para avisar se a logo vai encaixar mal no documento.
+async function medidasDaImagem(f: File): Promise<{ largura: number; altura: number } | null> {
+  const url = URL.createObjectURL(f)
+  try {
+    const img = new Image()
+    img.src = url
+    await img.decode()
+    return { largura: img.naturalWidth, altura: img.naturalHeight }
+  } catch {
+    return null
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
 function novaConta(): BancoConta {
   return { id: crypto.randomUUID(), apelido: '', banco: '', agencia: '', conta: '' }
 }
@@ -77,6 +93,7 @@ export default function CompanyInfo() {
   const [salvando, setSalvando] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [enviandoLogo, setEnviandoLogo] = useState(false)
+  const [avisosLogo, setAvisosLogo] = useState<string[]>([])
   const [tiposTexto, setTiposTexto] = useState(TIPOS_OBJETO_PADRAO.join(", "))
 
   useEffect(() => {
@@ -97,7 +114,7 @@ export default function CompanyInfo() {
   // Prévia da logo: o bucket é privado, então a imagem vem por link assinado.
   useEffect(() => {
     let vivo = true
-    if (!form.logoCaminho) { setLogoPreview(null); return }
+    if (!form.logoCaminho) return
     urlAssinada(form.logoCaminho).then(u => { if (vivo) setLogoPreview(u) }).catch(() => { if (vivo) setLogoPreview(null) })
     return () => { vivo = false }
   }, [form.logoCaminho])
@@ -109,6 +126,8 @@ export default function CompanyInfo() {
     setErro('')
     if (!LOGO_TIPOS.includes(f.type)) { setErro('A logo precisa ser uma imagem PNG, JPG ou WEBP.'); return }
     if (f.size > LOGO_MAX_BYTES) { setErro('A logo pode ter até 2 MB. Use uma imagem menor.'); return }
+    const medida = await medidasDaImagem(f)
+    setAvisosLogo(medida ? avisosDaLogo(medida.largura, medida.altura) : [])
     setEnviandoLogo(true)
     try {
       const enviado = await uploadAnexo(f, 'empresa/logo')
@@ -220,16 +239,19 @@ export default function CompanyInfo() {
           <div className="mt-4">
             <span className="block text-sm text-gray-600">Logo da empresa (sai no topo da Proposta e dos PDFs)</span>
             <div className="flex flex-wrap items-center gap-3 mt-1">
-              {logoPreview
-                ? <img src={logoPreview} alt="Logo da empresa" className="h-14 max-w-[200px] object-contain border rounded bg-white p-1" />
+              {form.logoCaminho && logoPreview
+                ? <img src={logoPreview} alt="Logo da empresa" title="Prévia no tamanho em que sai no documento"
+                    onLoad={e => { const i = e.currentTarget; const m = medidaNoPdf(i.naturalWidth / i.naturalHeight); i.style.width = m.largura * 1.5 + 'px'; i.style.height = m.altura * 1.5 + 'px' }}
+                    className="object-contain border rounded bg-white p-1" />
                 : <span className="text-sm text-gray-500">{form.logoCaminho ? 'Carregando a logo...' : 'Sem logo: o PDF sai só com o título.'}</span>}
               <label className="btn btn-ghost text-sm cursor-pointer">
                 {enviandoLogo ? 'Enviando...' : form.logoCaminho ? 'Trocar logo' : 'Enviar logo'}
                 <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={escolherLogo} disabled={enviandoLogo} />
               </label>
-              {form.logoCaminho && <button type="button" className="btn btn-ghost text-sm" onClick={() => setForm(fm => ({ ...fm, logoCaminho: null }))}>Tirar logo</button>}
+              {form.logoCaminho && <button type="button" className="btn btn-ghost text-sm" onClick={() => { setAvisosLogo([]); setForm(fm => ({ ...fm, logoCaminho: null })) }}>Tirar logo</button>}
             </div>
-            <p className="text-xs text-gray-500 mt-1">PNG, JPG ou WEBP até 2 MB. Só vale depois de tocar em Salvar.</p>
+            <p className="text-xs text-gray-500 mt-1">{LOGO_ORIENTACAO} PNG, JPG ou WEBP até 2 MB. Só vale depois de tocar em Salvar.</p>
+            {avisosLogo.map(a => <p key={a} className="text-xs mt-1" style={{ color: '#b45309' }}>{a}</p>)}
           </div>
         </div>
 
