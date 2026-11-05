@@ -3,6 +3,8 @@ import { getEmpresaInfo, saveEmpresaInfo } from '../utils/empresa'
 import { DECLARACAO_PROPOSTA_PADRAO } from '../utils/proposta'
 import { confirmarRemocao } from '../utils/confirmar'
 import DocumentosEmpresaSection from '../components/DocumentosEmpresaSection'
+import { uploadAnexo, urlAssinada } from '../utils/arquivo'
+import { configEmpresaMudou, listaDeTexto, SISTEMA_PADRAO, TIPOS_OBJETO_PADRAO } from '../utils/config-empresa'
 
 type BancoConta = {
   id: string
@@ -29,6 +31,9 @@ type EmpresaInfo = {
   representanteCpf: string
   representanteRg: string
   declaracoesProposta: string
+  nomeSistemaInterno: string
+  tiposObjeto: string[]
+  logoCaminho: string | null
 }
 
 const empty: EmpresaInfo = {
@@ -36,8 +41,14 @@ const empty: EmpresaInfo = {
   endereco: '', cep: '', cidade: '', uf: '', telefone: '', email: '',
   bancos: [],
   representanteNome: '', representanteCargo: '', representanteCpf: '', representanteRg: '',
-  declaracoesProposta: ''
+  declaracoesProposta: '',
+  nomeSistemaInterno: '',
+  tiposObjeto: TIPOS_OBJETO_PADRAO,
+  logoCaminho: null,
 }
+
+const LOGO_MAX_BYTES = 2 * 1024 * 1024
+const LOGO_TIPOS = ['image/png', 'image/jpeg', 'image/webp']
 
 function novaConta(): BancoConta {
   return { id: crypto.randomUUID(), apelido: '', banco: '', agencia: '', conta: '' }
@@ -64,6 +75,9 @@ export default function CompanyInfo() {
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [enviandoLogo, setEnviandoLogo] = useState(false)
+  const [tiposTexto, setTiposTexto] = useState(TIPOS_OBJETO_PADRAO.join(", "))
 
   useEffect(() => {
     let mounted = true
@@ -72,11 +86,39 @@ export default function CompanyInfo() {
       // Campos que nunca foram preenchidos voltam `null` do banco — sem isso
       // o React reclama de input controlado recebendo `null` como value.
       const semNulos = Object.fromEntries(Object.entries(raw || {}).filter(([, v]) => v !== null))
-      setForm({ ...empty, ...semNulos })
+      const carregado = { ...empty, ...semNulos }
+      setForm(carregado)
+      setTiposTexto((carregado.tiposObjeto?.length ? carregado.tiposObjeto : TIPOS_OBJETO_PADRAO).join(", "))
       setLoading(false)
     })
     return () => { mounted = false }
   }, [])
+
+  // Prévia da logo: o bucket é privado, então a imagem vem por link assinado.
+  useEffect(() => {
+    let vivo = true
+    if (!form.logoCaminho) { setLogoPreview(null); return }
+    urlAssinada(form.logoCaminho).then(u => { if (vivo) setLogoPreview(u) }).catch(() => { if (vivo) setLogoPreview(null) })
+    return () => { vivo = false }
+  }, [form.logoCaminho])
+
+  const escolherLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    setErro('')
+    if (!LOGO_TIPOS.includes(f.type)) { setErro('A logo precisa ser uma imagem PNG, JPG ou WEBP.'); return }
+    if (f.size > LOGO_MAX_BYTES) { setErro('A logo pode ter até 2 MB. Use uma imagem menor.'); return }
+    setEnviandoLogo(true)
+    try {
+      const enviado = await uploadAnexo(f, 'empresa/logo')
+      setForm(fm => ({ ...fm, logoCaminho: enviado.path }))
+    } catch (err: any) {
+      setErro(err?.message || 'Não foi possível enviar a logo.')
+    } finally {
+      setEnviandoLogo(false)
+    }
+  }
 
   const set = (k: keyof EmpresaInfo) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -85,7 +127,10 @@ export default function CompanyInfo() {
     setErro('')
     setSalvando(true)
     try {
-      await saveEmpresaInfo(form)
+      const tipos = listaDeTexto(tiposTexto)
+      const salvo = await saveEmpresaInfo({ ...form, nomeSistemaInterno: form.nomeSistemaInterno.trim(), tiposObjeto: tipos.length ? tipos : TIPOS_OBJETO_PADRAO })
+      configEmpresaMudou(salvo)
+      setTiposTexto((salvo.tiposObjeto?.length ? salvo.tiposObjeto : TIPOS_OBJETO_PADRAO).join(", "))
       setSavedAt(Date.now())
     } catch (err: any) {
       setErro(err?.message || 'Não foi possível salvar as informações da empresa.')
@@ -152,6 +197,39 @@ export default function CompanyInfo() {
           <div>
             <label htmlFor="emp-email" className="block text-sm text-gray-600">E-mail</label>
             <input id="emp-email" type="email" value={form.email} onChange={set('email')} className="w-full p-2 rounded" />
+          </div>
+        </div>
+
+        <div className="mt-6 bg-white border rounded p-4">
+          <h4 className="font-semibold">Como a empresa trabalha</h4>
+          <p className="text-sm text-gray-500 mb-3">Usado nas telas de licitação e nos relatórios.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="emp-sistema" className="block text-sm text-gray-600">Sistema interno (ERP) onde vocês lançam as licitações ganhas</label>
+              <input id="emp-sistema" value={form.nomeSistemaInterno} onChange={set('nomeSistemaInterno')} maxLength={40}
+                placeholder="ex.: Bling, Omie, Tiny" className="w-full p-2 rounded" />
+              <p className="text-xs text-gray-500 mt-1">Aparece em "Lançada no {form.nomeSistemaInterno.trim() || SISTEMA_PADRAO}". Em branco, fica "{SISTEMA_PADRAO}".</p>
+            </div>
+            <div>
+              <label htmlFor="emp-tipos" className="block text-sm text-gray-600">Tipos de objeto (separe com vírgula)</label>
+              <input id="emp-tipos" value={tiposTexto} onChange={e => setTiposTexto(e.target.value)}
+                placeholder={TIPOS_OBJETO_PADRAO.join(', ')} className="w-full p-2 rounded" />
+              <p className="text-xs text-gray-500 mt-1">As opções do campo "Tipo Objeto" da licitação. Ex.: Medicamentos, Materiais, Misto.</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <span className="block text-sm text-gray-600">Logo da empresa (sai no topo da Proposta e dos PDFs)</span>
+            <div className="flex flex-wrap items-center gap-3 mt-1">
+              {logoPreview
+                ? <img src={logoPreview} alt="Logo da empresa" className="h-14 max-w-[200px] object-contain border rounded bg-white p-1" />
+                : <span className="text-sm text-gray-500">{form.logoCaminho ? 'Carregando a logo...' : 'Sem logo: o PDF sai só com o título.'}</span>}
+              <label className="btn btn-ghost text-sm cursor-pointer">
+                {enviandoLogo ? 'Enviando...' : form.logoCaminho ? 'Trocar logo' : 'Enviar logo'}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={escolherLogo} disabled={enviandoLogo} />
+              </label>
+              {form.logoCaminho && <button type="button" className="btn btn-ghost text-sm" onClick={() => setForm(fm => ({ ...fm, logoCaminho: null }))}>Tirar logo</button>}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">PNG, JPG ou WEBP até 2 MB. Só vale depois de tocar em Salvar.</p>
           </div>
         </div>
 

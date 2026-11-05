@@ -27,7 +27,7 @@ describe('planilha de itens no modelo de cotação', () => {
   it('traz o bloco do pregão e a âncora na coluna B', () => {
     const { linhas, linhaCabecalho } = linhasDaPlanilha(ITENS, CAB)
     expect(linhas[1]).toEqual(['', 'Órgão:', 'Universidade Fictícia'])
-    expect(linhas[linhaCabecalho][1]).toBe('COD. KRALEN')
+    expect(linhas[linhaCabecalho][1]).toBe('CÓD. INTERNO')
   })
   it('sem itens gera o modelo vazio, que também é aceito', () => {
     const lido = itensDaPlanilha(idaEVolta([]))
@@ -44,6 +44,15 @@ describe('planilha de itens no modelo de cotação', () => {
     expect(nomeDoArquivo('')).toBe('itens-licitacao.xlsx')
   })
   it('recusa planilha fora do modelo', () => {
-    expect(itensDaPlanilha([['qualquer', 'coisa']])).toMatchObject({ erro: expect.stringContaining('COD. KRALEN') })
+    expect(itensDaPlanilha([['qualquer', 'coisa']])).toMatchObject({ erro: expect.stringContaining('CÓD. INTERNO') })
+  })
+  it('ainda lê os arquivos antigos, com "COD. KRALEN" no lugar de "CÓD. INTERNO"', () => {
+    const linhas = idaEVolta(ITENS).map(l => l.map(v => (v === 'CÓD. INTERNO' ? 'COD. KRALEN' : v)))
+    const lido = itensDaPlanilha(linhas)
+    if ('erro' in lido) throw new Error(lido.erro)
+    expect(lido.itens).toHaveLength(2)
+  })
+  it('"COD" no bloco do pregão sem "ITEM" ao lado não vira âncora', () => {
+    expect(itensDaPlanilha([['', 'Código do processo:', '150/2026']])).toHaveProperty('erro')
   })
 })

@@ -9,7 +9,8 @@ import { agruparPorLote, somaColuna, parseMotivo } from '../../utils/itens'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
-import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
+import { FiltroSistema, filtrosSistema, passaFiltroSistema } from '../../utils/filtroSistema'
+import { useConfigEmpresa } from '../../utils/config-empresa'
 
 type LicitacaoDesclassificada = {
   licitacao: any
@@ -50,7 +51,8 @@ export default function RelatorioItensDesclassificados() {
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
   const [busca, setBusca] = useState('')
-  const [filtroKralen, setFiltroKralen] = useState<FiltroKralen>('todas')
+  const [filtroSistema, setFiltroSistema] = useState<FiltroSistema>('todas')
+  const { sistema } = useConfigEmpresa()
   const [periodo, setPeriodo] = useState<Periodo>('todos')
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
@@ -78,7 +80,7 @@ export default function RelatorioItensDesclassificados() {
 
   const desclassificados: LicitacaoDesclassificada[] = licitacoes
     .filter(l => dataDentroDoPeriodo(l.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
-    .filter(l => passaFiltroKralen(l.lancadoNoKralen, filtroKralen))
+    .filter(l => passaFiltroSistema(l.lancadoNoSistema, filtroSistema))
     .map(l => ({ licitacao: l, itensDesclassificados: (itemsByCodigo[String(l.codigo)] || []).filter((it: any) => it.desclassificado) }))
     .map(g => termoBusca
       ? { ...g, itensDesclassificados: g.itensDesclassificados.filter((it: any) => (it.descricao || '').toLowerCase().includes(termoBusca)) }
@@ -115,7 +117,7 @@ export default function RelatorioItensDesclassificados() {
         Quantidade: Number(it.quantidade) || 0,
         Custo: Number(it.totalCusto) || 0,
         Motivo: it.motivoDesclassificacao || '',
-        Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
+        [sistema]: l.lancadoNoSistema ? 'Sim' : 'Não',
       }))
     )
     exportRowsToExcel(linhas, 'relatorio_itens_desclassificados.xlsx', 'Desclassificados')
@@ -173,14 +175,14 @@ export default function RelatorioItensDesclassificados() {
       )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
-        <span className="text-sm text-gray-600">Kralen:</span>
+        <span className="text-sm text-gray-600">{sistema}:</span>
         <div className="flex flex-wrap gap-2">
-          {FILTROS_KRALEN.map(f => (
+          {filtrosSistema(sistema).map(f => (
             <button
               key={f.id}
               type="button"
-              onClick={() => setFiltroKralen(f.id)}
-              className={filtroKralen === f.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
+              onClick={() => setFiltroSistema(f.id)}
+              className={filtroSistema === f.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
             >
               {f.label}
             </button>

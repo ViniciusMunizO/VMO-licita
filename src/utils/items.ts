@@ -125,20 +125,20 @@ export type HistoricoPrecoItem = {
   mediaValorUnitMinimo: number | null
 }
 
-// Como esse mesmo item (por codKralen, ou por descrição quando não tem
+// Como esse mesmo item (por codInterno, ou por descrição quando não tem
 // Kralen) se saiu em cotações passadas — de QUALQUER licitação, não só desta
 // — pra ajudar a decidir a margem de uma cotação nova olhando pro que já
 // funcionou antes. "Ocorrência"/"vitória" só contam licitação já decidida
 // (não conta o que ainda está em aberto, que não diz nada sobre sucesso).
-export async function buscarHistoricoPrecoItem(params: { codKralen?: string; descricao?: string; idExcluir?: string }): Promise<HistoricoPrecoItem | null> {
-  const codKralen = params.codKralen?.trim()
+export async function buscarHistoricoPrecoItem(params: { codInterno?: string; descricao?: string; idExcluir?: string }): Promise<HistoricoPrecoItem | null> {
+  const codInterno = params.codInterno?.trim()
   const descricao = params.descricao?.trim()
   let query = supabase
     .from('processo_itens')
     .select('id, valor_ganho, valor_unit_minimo, vencedor, desclassificado, criado_em, processos(status)')
     .eq('empresa_id', empresaAtual())
     .order('criado_em', { ascending: true })
-  if (codKralen) query = query.eq('codigo_interno', codKralen)
+  if (codInterno) query = query.eq('codigo_interno', codInterno)
   else if (descricao) query = query.ilike('descricao', descricao)
   else return null
 

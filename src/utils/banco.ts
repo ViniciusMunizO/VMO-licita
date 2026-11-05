@@ -7,7 +7,7 @@ import { paraNumero, INVALIDO } from './numero'
 //
 //   1. qual empresa está aberta agora (quem é de duas empresas escolhe uma);
 //   2. o tradutor de nomes: as telas continuam usando os nomes antigos
-//      (numeroPregao, codKralen, created_at...) e o banco usa os novos
+//      (numeroPregao, codInterno, created_at...) e o banco usa os novos
 //      (numero_pregao, codigo_interno, criado_em...);
 //   3. o "código" da licitação que as telas usam (1, 2, 3...) é o número do
 //      processo dentro da empresa; aqui ele vira o id de verdade do banco.
@@ -207,7 +207,7 @@ export const MAPA_PROCESSO: Mapa = {
     prazoGarantia: 'prazo_garantia',
     vigenciaContrato: 'vigencia_contrato',
     habilitacao: 'habilitacao',
-    lancadoNoKralen: 'lancado_no_erp',
+    lancadoNoSistema: 'lancado_no_erp',
     bancoId: 'banco_id',
     dataLimiteRecurso: { banco: 'data_limite_recurso', tipo: 'data' },
     dataLimiteImpugnacao: { banco: 'data_limite_impugnacao', tipo: 'data' },
@@ -223,7 +223,7 @@ export const MAPA_ITEM: Mapa = {
     id: { banco: 'id', soLeitura: true },
     item: 'item',
     lote: 'lote',
-    codKralen: 'codigo_interno',
+    codInterno: 'codigo_interno',
     descricao: 'descricao',
     unidade: 'unidade',
     quantidade: { banco: 'quantidade', tipo: 'numero' },

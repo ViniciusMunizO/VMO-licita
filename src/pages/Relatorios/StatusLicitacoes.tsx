@@ -7,7 +7,8 @@ import { formatFixed } from '../../utils/format'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
-import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
+import { FiltroSistema, filtrosSistema, passaFiltroSistema } from '../../utils/filtroSistema'
+import { useConfigEmpresa } from '../../utils/config-empresa'
 import StatusBadge from '../../components/StatusBadge'
 
 type Filtro = 'todas' | 'Ganhou' | 'Perdeu' | 'semStatus'
@@ -31,7 +32,8 @@ export default function RelatorioStatusLicitacoes() {
   const [loading, setLoading] = useState(true)
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [filtro, setFiltro] = useState<Filtro>('todas')
-  const [filtroKralen, setFiltroKralen] = useState<FiltroKralen>('todas')
+  const [filtroSistema, setFiltroSistema] = useState<FiltroSistema>('todas')
+  const { sistema } = useConfigEmpresa()
   const [periodo, setPeriodo] = useState<Periodo>('todos')
   const [dataInicioCustom, setDataInicioCustom] = useState('')
   const [dataFimCustom, setDataFimCustom] = useState('')
@@ -56,7 +58,7 @@ export default function RelatorioStatusLicitacoes() {
       if (filtro === 'semStatus') return !l.status
       return l.status === filtro
     })
-    .filter(l => passaFiltroKralen(l.lancadoNoKralen, filtroKralen))
+    .filter(l => passaFiltroSistema(l.lancadoNoSistema, filtroSistema))
 
   const exportarExcel = () => {
     const linhas = listaFiltrada.map(l => ({
@@ -67,7 +69,7 @@ export default function RelatorioStatusLicitacoes() {
       UF: contratanteUf(l),
       Pregão: l.numeroPregao || '',
       Status: l.status || 'Sem status',
-      Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
+      [sistema]: l.lancadoNoSistema ? 'Sim' : 'Não',
     }))
     exportRowsToExcel(linhas, 'relatorio_status_licitacoes.xlsx', 'Status')
   }
@@ -102,14 +104,14 @@ export default function RelatorioStatusLicitacoes() {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
-        <span className="text-sm text-gray-600">Kralen:</span>
+        <span className="text-sm text-gray-600">{sistema}:</span>
         <div className="flex flex-wrap gap-2">
-          {FILTROS_KRALEN.map(f => (
+          {filtrosSistema(sistema).map(f => (
             <button
               key={f.id}
               type="button"
-              onClick={() => setFiltroKralen(f.id)}
-              className={filtroKralen === f.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
+              onClick={() => setFiltroSistema(f.id)}
+              className={filtroSistema === f.id ? 'btn btn-primary text-sm' : 'btn btn-ghost text-sm'}
             >
               {f.label}
             </button>
@@ -189,7 +191,7 @@ export default function RelatorioStatusLicitacoes() {
                 <th className="p-1.5">Órgão:</th>
                 <th className="p-1.5">Pregão:</th>
                 <th className="p-1.5">Status:</th>
-                <th className="p-1.5">Kralen:</th>
+                <th className="p-1.5">{sistema}:</th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +207,7 @@ export default function RelatorioStatusLicitacoes() {
                   </td>
                   <td className="p-1.5">{l.numeroPregao ? `nº ${l.numeroPregao}` : '-'}</td>
                   <td className="p-1.5"><StatusBadge status={l.status} /></td>
-                  <td className="p-1.5 text-gray-600">{l.lancadoNoKralen ? 'Sim' : 'Não'}</td>
+                  <td className="p-1.5 text-gray-600">{l.lancadoNoSistema ? 'Sim' : 'Não'}</td>
                 </tr>
               ))}
             </tbody>

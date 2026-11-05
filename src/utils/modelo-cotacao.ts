@@ -2,8 +2,8 @@ import * as XLSX from 'xlsx'
 
 // Planilha "02. MODELO DE COTAÇÃO": um bloco de cabeçalho do pregão (linhas 1-6, o tamanho
 // pode variar de arquivo para arquivo) e depois a tabela de itens. A leitura não assume linha
-// nem coluna fixas: procura a célula "COD. KRALEN" nas primeiras linhas (em qualquer coluna) e
-// lê o resto em posições relativas a ela (COL_OFFSET). Isso evita quebrar quando o arquivo tem
+// nem coluna fixas: procura a célula do código interno ("CÓD. INTERNO"; nos arquivos antigos,
+// "COD. KRALEN") seguida de "ITEM" nas primeiras linhas (em qualquer coluna) e lê o resto em posições relativas a ela (COL_OFFSET). Isso evita quebrar quando o arquivo tem
 // uma coluna a mais ou a menos no início (aconteceu com um arquivo real de cliente).
 //
 // A partir da âncora, a leitura pula as colunas ocultas de % (só ajudam quem preenche a calcular
@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx'
 // Excel e importa de volta pelo "Importar Itens", sem mexer no layout.
 
 export const COL_OFFSET = {
-  codKralen: 0, item: 1, descricao: 2, unidade: 3, quantidade: 4,
+  codInterno: 0, item: 1, descricao: 2, unidade: 3, quantidade: 4,
   marcaCotacao: 5, origemCotacao: 6, valorUnitMinimo: 7, valorTotalMinimo: 9,
   valorUnitMunicipio: 10, valorTotalMunicipio: 12, valorCusto: 13, totalCusto: 14,
   ganhador: 15, marcaVencedora: 17, valorTotalArrematado: 20,
@@ -44,13 +44,16 @@ export function validarCabecalho(headerRow: any[], col: Coluna): string[] {
   return problemas
 }
 
-/** Procura "COD. KRALEN" em qualquer coluna das primeiras 20 linhas. */
+/**
+ * Procura, nas primeiras 20 linhas, a coluna do código interno: uma célula que começa com "COD"
+ * ("CÓD. INTERNO", "COD. KRALEN" dos arquivos antigos ou o nome do sistema da empresa) e tem
+ * "ITEM" logo à direita.
+ */
 export function encontrarAncora(rows: any[][]): { linha: number; coluna: number } | null {
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
     const row = rows[i] || []
     for (let c = 0; c < row.length; c++) {
-      const texto = normalizar(row[c])
-      if (texto.startsWith('COD') && texto.includes('KRALEN')) return { linha: i, coluna: c }
+      if (normalizar(row[c]).startsWith('COD') && normalizar(row[c + COL_OFFSET.item]) === 'ITEM') return { linha: i, coluna: c }
     }
   }
   return null
@@ -70,7 +73,7 @@ export function rowToItem(row: any[], col: Coluna): Record<string, any> {
   const vencedor = pareceGanhador(row[col.ganhador])
   const marcaVencedora = String(row[col.marcaVencedora] ?? '').trim()
   return {
-    codKralen: row[col.codKralen] ?? '',
+    codInterno: row[col.codInterno] ?? '',
     item: row[col.item] ?? '',
     descricao: row[col.descricao] ?? '',
     unidade: row[col.unidade] ?? '',
@@ -91,7 +94,7 @@ export function rowToItem(row: any[], col: Coluna): Record<string, any> {
 /** Lê a planilha inteira (linhas como listas) e devolve os itens, ou o erro pronto para mostrar. */
 export function itensDaPlanilha(rows: any[][]): { itens: Record<string, any>[] } | { erro: string } {
   const ancora = encontrarAncora(rows)
-  if (!ancora) return { erro: 'Não reconheci o modelo dessa planilha — a coluna "COD. KRALEN" não foi encontrada.' }
+  if (!ancora) return { erro: 'Não reconheci o modelo dessa planilha — a coluna "CÓD. INTERNO" seguida de "ITEM" não foi encontrada. Baixe a planilha modelo e use as mesmas colunas.' }
   const col = colunasDaAncora(ancora)
   const problemas = validarCabecalho(rows[ancora.linha], col)
   if (problemas.length) return { erro: 'A planilha não bate com o modelo esperado, nada foi importado: ' + problemas.join('; ') + '.' }
@@ -107,7 +110,7 @@ export function itensDaPlanilha(rows: any[][]): { itens: Record<string, any>[] }
 
 /** Cabeçalho da tabela, na ordem de COL_OFFSET (as colunas 8, 11, 16, 18 e 19 são de apoio). */
 export const CABECALHO = [
-  'COD. KRALEN', 'ITEM', 'DESCRIÇÃO', 'UNID.', 'QUANT.', 'MARCA', 'ORIGEM COTAÇÃO',
+  'CÓD. INTERNO', 'ITEM', 'DESCRIÇÃO', 'UNID.', 'QUANT.', 'MARCA', 'ORIGEM COTAÇÃO',
   'VALOR UNIT. MÍNIMO', '% MÍNIMO', 'VALOR TOTAL MÍNIMO', 'VALOR UNIT. MUNICÍPIO', '% MUNICÍPIO', 'VALOR TOTAL MUNICÍPIO',
   'VALOR CUSTO', 'TOTAL CUSTO', 'GANHADOR', 'EMPRESA GANHADORA', 'MARCA VENCEDORA',
   'VALOR UNIT. ARREMATADO', '% ARREMATADO', 'VALOR TOTAL ARREMATADO',
@@ -147,7 +150,7 @@ export function linhasDaPlanilha(itens: Record<string, any>[], cab: CabecalhoPre
   ]
   const tabela = itens.map(it => {
     const linha: any[] = Array(CABECALHO.length).fill('')
-    linha[COL_OFFSET.codKralen] = it.codKralen ?? ''
+    linha[COL_OFFSET.codInterno] = it.codInterno ?? ''
     linha[COL_OFFSET.item] = it.item ?? ''
     linha[COL_OFFSET.descricao] = it.descricao ?? ''
     linha[COL_OFFSET.unidade] = it.unidade ?? ''

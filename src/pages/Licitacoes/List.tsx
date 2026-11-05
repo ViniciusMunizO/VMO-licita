@@ -8,11 +8,15 @@ import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
 import { DateInputBR } from '../../components/DateTimeBR'
 import StatusBadge from '../../components/StatusBadge'
 import RascunhosRadar from '../../components/RascunhosRadar'
+import { useConfigEmpresa } from '../../utils/config-empresa'
 
 const FILTROS_VAZIOS = { codigo: '', contratante: '', numeroPregao: '', numeroProcesso: '', portal: '', tipoObjeto: '', tipoDisputa: '', status: '', hasAta: 'any', q: '' }
 
 export default function ListLicitacoes() {
   const [list, setList] = useState<any[]>([])
+  const { tiposObjeto } = useConfigEmpresa()
+  // Opções do filtro: as da empresa e as que já existem nas licitações (cadastros antigos).
+  const tiposNaLista = useMemo(() => [...new Set([...tiposObjeto, ...list.map(l => l.tipoObjeto).filter(Boolean)])], [tiposObjeto, list])
   const [hasAtaByCodigo, setHasAtaByCodigo] = useState<Record<string, boolean>>({})
   // `null` = ainda não buscado. A busca por texto de item só baixa dado do
   // banco quando o usuário de fato digita algo em "Busca geral" — antes desta
@@ -150,9 +154,7 @@ export default function ListLicitacoes() {
           <input placeholder="Portal" value={filters.portal} onChange={e => setFilters({ ...filters, portal: e.target.value })} className="p-2 rounded" />
           <select value={filters.tipoObjeto} onChange={e => setFilters({ ...filters, tipoObjeto: e.target.value })} className="p-2 rounded">
             <option value="">Tipo Objeto (qualquer)</option>
-            <option>Medicamentos</option>
-            <option>Materiais</option>
-            <option>Misto</option>
+            {tiposNaLista.map(t => <option key={t}>{t}</option>)}
           </select>
           <select value={filters.tipoDisputa} onChange={e => setFilters({ ...filters, tipoDisputa: e.target.value })} className="p-2 rounded">
             <option value="">Tipo de disputa (qualquer)</option>

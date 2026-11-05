@@ -10,7 +10,8 @@ import DeclaracoesSection from '../../components/DeclaracoesSection'
 import EntregasSection from '../../components/EntregasSection'
 import PrintableChecklist from '../../components/PrintableChecklist'
 import PrintableProposta from '../../components/PrintableProposta'
-import { setLancadoNoKralen } from '../../utils/kralen'
+import { marcarLancadoNoSistema } from '../../utils/lancamento'
+import { useConfigEmpresa } from '../../utils/config-empresa'
 import { getLicitacao, updateLicitacao } from '../../utils/licitacoes'
 import { listItems, updateItem, buscarHistoricoPrecoItem, HistoricoPrecoItem } from '../../utils/items'
 import { MOTIVOS_DESCLASSIFICACAO, PREFIXO_OUTRO, parseMotivo, formatMotivo } from '../../utils/itens'
@@ -71,7 +72,7 @@ function printElement(el: HTMLElement, title: string) {
 const ITEM_FIELDS: { key: string; label: string; wide?: boolean }[] = [
   { key: 'lote', label: 'Lote' },
   { key: 'item', label: 'Item' },
-  { key: 'codKralen', label: 'Cód. Kralen' },
+  { key: 'codInterno', label: 'Cód. interno' },
   { key: 'descricao', label: 'Descrição', wide: true },
   { key: 'unidade', label: 'Uni' },
   { key: 'quantidade', label: 'Qtd' },
@@ -89,6 +90,7 @@ const ITEM_FIELDS: { key: string; label: string; wide?: boolean }[] = [
 export default function DetailLicitacao() {
   const { codigo } = useParams()
   const nav = useNavigate()
+  const { sistema } = useConfigEmpresa()
   const [model, setModel] = useState<any>(null)
   const [attachments, setAttachments] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
@@ -281,16 +283,16 @@ export default function DetailLicitacao() {
     await gerarPropostaPdf(bancoProposta)
   }
 
-  const toggleKralen = async (checked: boolean) => {
+  const alternarLancado = async (checked: boolean) => {
     const userName = localStorage.getItem('user_name') || undefined
-    const list = await setLancadoNoKralen(model.codigo, checked, userName)
+    const list = await marcarLancadoNoSistema(model.codigo, checked, userName)
     const found = list.find((x: any) => String(x.codigo) === String(model.codigo))
     if (found) setModel(found)
   }
 
   // Ganhou/Perdeu muda com frequência (assim que sai o resultado) e não devia
   // exigir entrar no formulário de edição inteiro só por isso — igual ao
-  // Kralen, troca na hora direto na tela de detalhe.
+  // sistema interno, troca na hora direto na tela de detalhe.
   const alterarStatus = async (novoStatus: string) => {
     const atualizado = await updateLicitacao(model.codigo, { status: novoStatus || null })
     setModel(atualizado)
@@ -362,7 +364,7 @@ export default function DetailLicitacao() {
     setEditItemDraft({ ...items[idx] })
     setHistoricoPreco(null)
     setCarregandoHistorico(true)
-    buscarHistoricoPrecoItem({ codKralen: items[idx].codKralen, descricao: items[idx].descricao, idExcluir: items[idx].id })
+    buscarHistoricoPrecoItem({ codInterno: items[idx].codInterno, descricao: items[idx].descricao, idExcluir: items[idx].id })
       .then(setHistoricoPreco)
       .catch(() => setHistoricoPreco(null))
       .finally(() => setCarregandoHistorico(false))
@@ -417,8 +419,8 @@ export default function DetailLicitacao() {
             </select>
           </label>
           <label className="flex items-center gap-2 text-sm font-normal text-gray-600">
-            <input type="checkbox" checked={!!model.lancadoNoKralen} onChange={e => toggleKralen(e.target.checked)} />
-            Lançada no Kralen
+            <input type="checkbox" checked={!!model.lancadoNoSistema} onChange={e => alternarLancado(e.target.checked)} />
+            Lançada no {sistema}
           </label>
         </h3>
         <div className="flex flex-wrap gap-2 flex-shrink-0">
@@ -589,7 +591,7 @@ export default function DetailLicitacao() {
                   <th className="p-2">Descrição</th>
                   <th className="p-2">Uni</th>
                   <th className="p-2">Qtd</th>
-                  <th className="p-2">Cód. Kralen</th>
+                  <th className="p-2">Cód. interno</th>
                   <th className="p-2">Marca</th>
                   <th className="p-2">Origem Cotação</th>
                   <th className="p-2">Valor Custo</th>
@@ -623,7 +625,7 @@ export default function DetailLicitacao() {
                         </td>
                         <td className="p-2">{it.unidade || '-'}</td>
                         <td className="p-2">{formatNumeric(it.quantidade ?? it.qty)}</td>
-                        <td className="p-2">{it.codKralen || '-'}</td>
+                        <td className="p-2">{it.codInterno || '-'}</td>
                         <td className="p-2">{it.marca || '-'}</td>
                         <td className="p-2">{it.origemCotacao || '-'}</td>
                         <td className="p-2">{formatNumeric(it.valorCusto)}</td>

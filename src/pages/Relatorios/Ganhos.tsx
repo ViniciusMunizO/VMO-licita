@@ -6,11 +6,12 @@ import { formatDateTimeBR, nowInBrasilia } from '../../utils/date'
 import { DateInputBR } from '../../components/DateTimeBR'
 import { formatNumeric, formatFixed, formatMoneyBRL, margemPercentual } from '../../utils/format'
 import { agruparPorLote, somaColuna } from '../../utils/itens'
-import { setLancadoNoKralen } from '../../utils/kralen'
+import { marcarLancadoNoSistema } from '../../utils/lancamento'
 import { exportElementsToPdf } from '../../utils/pdf'
 import { exportRowsToExcel } from '../../utils/excel'
 import { Periodo, PERIODOS, dataDentroDoPeriodo } from '../../utils/periodo'
-import { FiltroKralen, FILTROS_KRALEN, passaFiltroKralen } from '../../utils/filtroKralen'
+import { FiltroSistema, filtrosSistema, passaFiltroSistema } from '../../utils/filtroSistema'
+import { useConfigEmpresa } from '../../utils/config-empresa'
 
 type LicitacaoGanha = {
   licitacao: any
@@ -54,7 +55,8 @@ export default function RelatorioGanhos() {
   const [loading, setLoading] = useState(true)
   const [licitacoes, setLicitacoes] = useState<any[]>([])
   const [itemsByCodigo, setItemsByCodigo] = useState<Record<string, any[]>>({})
-  const [filtro, setFiltro] = useState<FiltroKralen>('naoLancadas')
+  const [filtro, setFiltro] = useState<FiltroSistema>('naoLancadas')
+  const { sistema } = useConfigEmpresa()
   const [busca, setBusca] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('todos')
   const [dataInicioCustom, setDataInicioCustom] = useState('')
@@ -80,9 +82,9 @@ export default function RelatorioGanhos() {
     })
   }, [])
 
-  const toggleKralen = async (codigo: number, checked: boolean) => {
+  const alternarLancado = async (codigo: number, checked: boolean) => {
     const userName = localStorage.getItem('user_name') || undefined
-    const list = await setLancadoNoKralen(codigo, checked, userName)
+    const list = await marcarLancadoNoSistema(codigo, checked, userName)
     setLicitacoes(list)
   }
 
@@ -95,7 +97,7 @@ export default function RelatorioGanhos() {
       : g
     )
     .filter(g => g.itensVencedores.length > 0)
-    .filter(g => passaFiltroKralen(g.licitacao.lancadoNoKralen, filtro))
+    .filter(g => passaFiltroSistema(g.licitacao.lancadoNoSistema, filtro))
     .filter(g => dataDentroDoPeriodo(g.licitacao.dataLicitacao, periodo, hoje, dataInicioCustom, dataFimCustom))
 
   const todosItensVencedores = ganhos.flatMap(g => g.itensVencedores)
@@ -121,7 +123,7 @@ export default function RelatorioGanhos() {
         // `undefined` (não '') pra célula ficar realmente vazia na planilha
         // em vez de virar texto misturado com número na mesma coluna.
         'Margem %': margemPercentual(Number(it.valorGanho) || 0, Number(it.totalCusto) || 0) ?? undefined,
-        Kralen: l.lancadoNoKralen ? 'Sim' : 'Não',
+        [sistema]: l.lancadoNoSistema ? 'Sim' : 'Não',
       }))
     )
     exportRowsToExcel(linhas, 'relatorio_itens_ganhos.xlsx', 'Itens Ganhos')
@@ -154,9 +156,9 @@ export default function RelatorioGanhos() {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
-        <span className="text-sm text-gray-600">Kralen:</span>
+        <span className="text-sm text-gray-600">{sistema}:</span>
         <div className="flex flex-wrap gap-2">
-          {FILTROS_KRALEN.map(f => (
+          {filtrosSistema(sistema).map(f => (
             <button
               key={f.id}
               type="button"
@@ -237,7 +239,7 @@ export default function RelatorioGanhos() {
           <div className="text-sm text-gray-500">
             {termoBusca
               ? `Nenhum item ganho encontrado com "${busca}".`
-              : filtro === 'naoLancadas' ? 'Nenhum ganho pendente de lançamento no Kralen.' : 'Nenhum item vencedor cadastrado ainda.'}
+              : filtro === 'naoLancadas' ? `Nenhum ganho pendente de lançamento no ${sistema}.` : 'Nenhum item vencedor cadastrado ainda.'}
           </div>
         ) : (
           <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
@@ -273,8 +275,8 @@ export default function RelatorioGanhos() {
                       <td className="p-1.5 whitespace-nowrap align-top">Pregão Eletrônico{l.numeroPregao ? ` / nº ${l.numeroPregao}` : ''}</td>
                       <td className="p-1.5 align-top" colSpan={5}>
                         <label className="flex items-center justify-end gap-2 text-xs text-gray-600">
-                          <input type="checkbox" checked={!!l.lancadoNoKralen} onChange={e => toggleKralen(l.codigo, e.target.checked)} />
-                          Lançada no Kralen
+                          <input type="checkbox" checked={!!l.lancadoNoSistema} onChange={e => alternarLancado(l.codigo, e.target.checked)} />
+                          Lançada no {sistema}
                         </label>
                       </td>
                     </tr>

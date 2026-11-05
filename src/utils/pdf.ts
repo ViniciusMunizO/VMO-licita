@@ -1,9 +1,10 @@
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
-import logoUrl from '../assets/logo-botti.png'
+import { carregarConfigEmpresa } from './config-empresa'
+import { urlAssinada } from './arquivo'
 
-// A logo entra no PDF como imagem, então precisa virar base64. O arquivo é o
-// mesmo que o Vite já empacota pra tela; carregamos uma vez e reaproveitamos.
+// A logo é a da empresa aberta (Informações da Empresa → Logo), guardada no Storage.
+// Entra no PDF como imagem, então precisa virar base64; carregamos uma vez por arquivo.
 //
 // A logo original é PNG com fundo transparente, e aí cada visualizador de PDF
 // decide contra o que compor esse transparente — Chrome usa branco, mas
@@ -12,14 +13,16 @@ import logoUrl from '../assets/logo-botti.png'
 // convertida pra JPEG, que não tem canal alfa: sem transparência, não há o
 // que o visualizador decidir, e o resultado é igual em qualquer um.
 //
-// A proporção vem do próprio arquivo: trocar a logo por a de outro cliente
-// não exige mexer em nenhuma medida aqui.
-let logoCache: { dataUrl: string; aspecto: number } | null = null
+// A proporção vem do próprio arquivo: cada empresa usa a logo que quiser sem mexer em medida.
+let logoCache: { caminho: string; dataUrl: string; aspecto: number } | null = null
 async function carregarLogo(): Promise<{ dataUrl: string; aspecto: number } | null> {
-  if (logoCache) return logoCache
   try {
+    const { logoCaminho } = await carregarConfigEmpresa()
+    if (!logoCaminho) return null
+    if (logoCache?.caminho === logoCaminho) return logoCache
     const img = new Image()
-    img.src = logoUrl
+    img.crossOrigin = 'anonymous' // link assinado de outro domínio: sem isso o canvas não exporta
+    img.src = await urlAssinada(logoCaminho)
     await new Promise((resolve, reject) => {
       img.onload = resolve
       img.onerror = reject
@@ -34,6 +37,7 @@ async function carregarLogo(): Promise<{ dataUrl: string; aspecto: number } | nu
     ctx.drawImage(img, 0, 0)
 
     logoCache = {
+      caminho: logoCaminho,
       // 0.98: a logo é pequena no papel e tem bordas duras, então vale
       // gastar bytes pra não aparecer artefato de compressão em volta dela
       dataUrl: canvas.toDataURL('image/jpeg', 0.98),

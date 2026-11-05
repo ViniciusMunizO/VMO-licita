@@ -45,7 +45,7 @@ const ITEM_COLUMNS: { key: string; label: string; width: string; fallback?: stri
   { key: 'descricao', label: 'Descrição', width: '16%', fallback: ['description'], maxChars: 110 },
   { key: 'unidade', label: 'Uni', width: '6%' },
   { key: 'quantidade', label: 'Qtd', width: '5%', fallback: ['qty'], numeric: true },
-  { key: 'codKralen', label: 'Cód. Kralen', width: '7%' },
+  { key: 'codInterno', label: 'Cód. interno', width: '7%' },
   { key: 'marca', label: 'Marca', width: '8%' },
   { key: 'origemCotacao', label: 'Origem Cotação', width: '9%' },
   { key: 'valorCusto', label: 'Valor Custo', width: '7%', numeric: true },

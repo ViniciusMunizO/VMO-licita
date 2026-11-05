@@ -26,7 +26,7 @@ node scripts/_gerar-planilha.js   # gera as planilhas de teste (uma vez)
 node scripts/_t1-auth.js               # login, sessão, navegação
 node scripts/_t2-licitacoes.js         # listagem, filtros, criar/editar/detalhe
 node scripts/_t3-itens.js              # importação de planilha (válida e inválida)
-node scripts/_t4-operacoes-item.js     # vencedor, desclassificação, cálculos, Kralen
+node scripts/_t4-operacoes-item.js     # vencedor, desclassificação, cálculos, lançado no sistema interno
 node scripts/_t5-anexos-atas-empresa.js # anexos, atas, contratantes, empresa/bancos/documentos
 node scripts/_t6-relatorios-docs.js    # 4 relatórios, filtros, PDFs, declarações
 node scripts/_t7-seguranca-limites.js  # RLS, privilégios, XSS, casos extremos
@@ -62,7 +62,7 @@ São duas, com papéis diferentes — não confundir:
 |---|---|---|
 | `src/assets/logo-vmo.png` | login, navbar, tela de conta pendente | VMO Sistemas (o sistema) |
 | `src/assets/logo-vmo-simbolo.png` | favicon (via `public/favicon.png`) | VMO Sistemas (o sistema) |
-| `src/assets/logo-botti.png` | cabeçalho dos PDFs emitidos | a empresa que usa o sistema |
+| logo enviada em Informações da Empresa (Storage, `<empresa>/empresa/logo/...`) | cabeçalho dos PDFs emitidos | a empresa que usa o sistema |
 
 A ideia: a interface é o produto da VMO, mas os documentos emitidos são da
 empresa cliente e vão pra mãos de terceiros (órgãos públicos), então levam a
@@ -70,9 +70,10 @@ marca dela.
 
 ### Trocar a logo do cliente (a dos PDFs)
 
-Substitua `src/assets/logo-botti.png` pela logo do cliente novo. A proporção é
-lida da própria imagem, não precisa ajustar medida nenhuma no código. A logo
-deve ser escura, porque o cabeçalho do PDF é claro.
+Cada empresa envia a própria logo em **Informações da Empresa → Como a empresa trabalha**
+(PNG, JPG ou WEBP até 2 MB) e toca em Salvar. Não precisa mexer no código: a proporção é
+lida da própria imagem. Sem logo, o PDF sai só com o título. A logo deve ser escura,
+porque o cabeçalho do PDF é claro.
 
 Se a imagem tiver fundo transparente, tudo bem: antes de entrar no PDF ela é
 desenhada sobre branco e convertida pra JPEG, justamente pra não depender de

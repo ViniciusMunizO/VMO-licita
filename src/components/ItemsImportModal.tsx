@@ -109,7 +109,7 @@ export default function ItemsImportModal({ open, onClose, codigo, cabecalho }: {
           {items.slice(0, 50).map((it, i) => (
             <div key={i} className="text-sm border-b py-2">
               <div className="font-medium">
-                {it.codKralen ? `[${it.codKralen}] ` : ''}{it.lote ? `Lote ${it.lote} — ` : ''}Item {it.item || i + 1} — {it.descricao || '-'}
+                {it.codInterno ? `[${it.codInterno}] ` : ''}{it.lote ? `Lote ${it.lote} — ` : ''}Item {it.item || i + 1} — {it.descricao || '-'}
               </div>
               <div className="text-xs text-gray-700 mt-1">Uni: {it.unidade || '-'} — Qtd: {it.quantidade || '-'} — Marca: {it.marca || '-'}</div>
             </div>

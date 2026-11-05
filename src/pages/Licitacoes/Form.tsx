@@ -11,6 +11,7 @@ import { getLicitacao, createLicitacao, updateLicitacao, previewNextCodigo, getR
 import { auditLog } from '../../utils/audit'
 import { replaceItems } from '../../utils/items'
 import { baixarPlanilhaItens } from '../../utils/modelo-cotacao'
+import { carregarConfigEmpresa, opcoesTipoObjeto, useConfigEmpresa } from '../../utils/config-empresa'
 import { itensDoPncp, juntarItens, lerEditalDoRascunho, pedirLeituraEdital, preencherDoEdital, type EditalDoRascunho, type ItemCadastro, type Origem } from '../../utils/edital'
 
 type Leitura = { estado: 'lendo' | 'pronto' | 'sem_ia' | 'teto' | 'falhou' | 'erro'; avisos?: string[]; msg?: string }
@@ -56,6 +57,7 @@ export default function FormLicitacao() {
   const { user } = useAuth()
   const nav = useNavigate()
   const location = useLocation()
+  const { tiposObjeto } = useConfigEmpresa()
   const [modelo, setModelo] = useState<Licitacao>({ codigo: 0, ano: new Date().getFullYear() })
   const [isEditing, setIsEditing] = useState(false)
   // Rascunho do Radar sendo completado: o id do processo (ainda sem código).
@@ -139,6 +141,17 @@ export default function FormLicitacao() {
   // Só preenche o que está vazio: nunca apaga o que a pessoa já digitou.
   const aplicarEdital = (e: EditalDoRascunho) => {
     const p = preencherDoEdital(e)
+    // A sugestão de tipo (Medicamentos/Materiais/Misto) só entra se for uma das opções da empresa.
+    const tipoSugerido = p.campos.tipoObjeto
+    if (tipoSugerido) {
+      delete p.campos.tipoObjeto
+      delete p.origem.tipoObjeto
+      carregarConfigEmpresa().then(c => {
+        if (!c.tiposObjeto.includes(String(tipoSugerido))) return
+        setModelo((m: any) => (m.tipoObjeto ? m : { ...m, tipoObjeto: tipoSugerido }))
+        setOrigem(o => (o.tipoObjeto ? o : { ...o, tipoObjeto: { fonte: 'sugestao' } }))
+      })
+    }
     setModelo(m => {
       const n: any = { ...m }
       for (const [campo, valor] of Object.entries(p.campos)) if (!n[campo]) n[campo] = valor
@@ -366,9 +379,7 @@ export default function FormLicitacao() {
             <label htmlFor="f-tipoObjeto" className="block text-sm text-gray-600">Tipo Objeto</label>
             <select id="f-tipoObjeto" value={(modelo as any).tipoObjeto || ''} onChange={e => setModelo({ ...modelo, tipoObjeto: e.target.value })} className="w-full p-2 rounded">
               <option value="">— selecione —</option>
-              <option>Medicamentos</option>
-              <option>Materiais</option>
-              <option>Misto</option>
+              {opcoesTipoObjeto(tiposObjeto, (modelo as any).tipoObjeto).map(t => <option key={t}>{t}</option>)}
             </select>
             {marca('tipoObjeto')}
           </div>
