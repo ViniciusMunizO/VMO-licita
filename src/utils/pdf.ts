@@ -63,7 +63,9 @@ function hexToRgb(hex: string) {
 
 // Uma linha de pixels "sem tinta" não tem nada escuro (texto, número, linha preta): só fundo,
 // listra clara da tabela ou borda cinza-clara. É onde dá para virar a página sem cortar letra.
-const TINTA = 170 // luminância (0-255) abaixo da qual o pixel conta como tinta
+// Luminância (0-255) abaixo da qual o pixel conta como tinta. 200 pega também a borda clarinha
+// das letras (o pé do "p" e do "g"); fundos e listras da tabela (acima de 230) continuam vazios.
+const TINTA = 200
 function linhaSemTinta(canvas: HTMLCanvasElement): (y: number) => boolean {
   const ctx = canvas.getContext('2d')
   if (!ctx) return () => false
