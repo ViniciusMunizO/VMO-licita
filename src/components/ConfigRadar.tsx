@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import {
-  lerFiltrosRadar, salvarFiltrosRadar, gerarCodigoTelegram, desconectarTelegram, UFS, type FiltrosRadar,
+  lerFiltrosRadar, salvarFiltrosRadar, gerarCodigoTelegram, desconectarTelegram, conferirPalavras, UFS, type FiltrosRadar,
 } from '../utils/radar'
+import {
+  adicionarPalavra, frasePalavra, normalizar, separarPalavras, sugerirSinonimos, trocarPalavra, type ConferenciaPalavra,
+} from '../utils/palavras-radar'
 
 // Telegram e filtros do Radar da empresa. Todos veem; só o admin muda
 // (o banco também confere: membro que tentar recebe erro).
@@ -28,6 +31,24 @@ export default function ConfigRadar({ onCarregado, onFiltrosSalvos }: Props) {
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [confirmarDesconectar, setConfirmarDesconectar] = useState(false)
+  // Conferência das palavras enquanto a pessoa escreve (migração 0017). null = banco sem a conferência.
+  const [conferencia, setConferencia] = useState<ConferenciaPalavra[] | null>([])
+  const lista = useMemo(() => separarPalavras(palavras), [palavras])
+  const sinonimos = useMemo(() => sugerirSinonimos(lista), [lista])
+  const porPalavra = useMemo(
+    () => new Map((conferencia || []).map(c => [normalizar(c.palavra), c])), [conferencia])
+
+  // Espera a pessoa parar de digitar e pergunta ao banco quantas cada palavra acha nos estados marcados.
+  useEffect(() => {
+    if (!editando || !lista.length || !ufs.length) return
+    let cancelado = false
+    const t = setTimeout(() => {
+      conferirPalavras(lista, ufs)
+        .then(c => { if (!cancelado) setConferencia(c) })
+        .catch(() => { /* a conferência é só ajuda: se falhar, a tela continua igual */ })
+    }, 700)
+    return () => { cancelado = true; clearTimeout(t) }
+  }, [editando, lista, ufs])
 
   const carregar = async () => {
     const f = await lerFiltrosRadar()
@@ -70,7 +91,7 @@ export default function ConfigRadar({ onCarregado, onFiltrosSalvos }: Props) {
     setSalvando(true)
     try {
       await salvarFiltrosRadar({
-        palavrasChave: palavras.split(/[,;\n]/).map(p => p.trim()).filter(Boolean),
+        palavrasChave: separarPalavras(palavras),
         ufs,
         valorMinimo: valor,
       })
@@ -160,6 +181,45 @@ export default function ConfigRadar({ onCarregado, onFiltrosSalvos }: Props) {
             <textarea id="radar-palavras" value={palavras} onChange={e => setPalavras(e.target.value)} rows={2}
               className="w-full p-2 rounded" placeholder="Ex.: detergente, material de limpeza, merenda" />
           </div>
+          {lista.length > 0 && (
+            <div className="rounded p-3 grid gap-2" style={{ background: 'var(--color-bg-subtle, #f3f4f6)' }}
+              aria-live="polite" aria-label="O que o Radar entendeu">
+              <p className="font-semibold">O Radar entendeu</p>
+              {conferencia !== null && (ufs.length ? (
+                <ul className="grid gap-1">
+                  {lista.map(p => {
+                    const c = porPalavra.get(normalizar(p))
+                    const sugestao = c?.sugestao
+                    return (
+                      <li key={normalizar(p)} className="flex flex-wrap items-center gap-x-2">
+                        <span aria-hidden="true" style={{ color: !c ? undefined : c.abertas > 0 ? 'var(--color-success-text, #15803d)' : 'var(--color-warning-text, #92400e)' }}>
+                          {!c ? '…' : c.abertas > 0 ? '✓' : '⚠'}
+                        </span>
+                        <b>{p}</b>
+                        <span className="text-gray-600">{c ? frasePalavra(c) : 'conferindo...'}</span>
+                        {c && sugestao && (c.abertas === 0
+                          ? <button type="button" className="btn btn-ghost" onClick={() => setPalavras(t => trocarPalavra(t, p, sugestao))}>Trocar por "{sugestao}"</button>
+                          : <button type="button" className="btn btn-ghost" onClick={() => setPalavras(t => adicionarPalavra(t, sugestao))}>Adicionar "{sugestao}"</button>)}
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : <p className="text-gray-600">Marque os estados para ver quantas licitações abertas cada palavra acha.</p>)}
+              {sinonimos.length > 0 && (
+                <ul className="grid gap-1">
+                  {sinonimos.map(s => (
+                    <li key={s.para} className="flex flex-wrap items-center gap-x-2">
+                      <span aria-hidden="true">💡</span>
+                      <span>Os órgãos costumam escrever <b>{s.para}</b> em vez de "{s.de}".</span>
+                      <button type="button" className="btn btn-ghost" onClick={() => setPalavras(t => adicionarPalavra(t, s.para))}>Adicionar "{s.para}"</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* Só com a migração 0017 no banco (sem ela a conferência volta null) isso é verdade. */}
+              {conferencia !== null && <p className="text-gray-600">Plural, singular, acento e maiúscula não importam: "luvas" acha "luva" e "papel" acha "papéis".</p>}
+            </div>
+          )}
           <fieldset>
             <legend className="text-gray-600 mb-1">Estados</legend>
             <div className="flex flex-wrap gap-2">

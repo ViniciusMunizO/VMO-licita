@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import { empresaAtual } from './banco'
+import type { ConferenciaPalavra } from './palavras-radar'
 
 // O Radar de Licitações dentro do site (migração 0014 do banco do Radar).
 // Tudo passa por funções do banco que conferem se a pessoa é da empresa:
@@ -161,6 +162,28 @@ export async function salvarFiltrosRadar(f: Pick<FiltrosRadar, 'palavrasChave' |
     p_empresa: empresaAtual(), p_palavras: f.palavrasChave, p_ufs: f.ufs, p_valor_minimo: f.valorMinimo,
   })
   if (error) throw error
+}
+
+/**
+ * Quantas licitações abertas cada palavra acha agora e, se achar pouca, a palavra parecida que aparece
+ * nas licitações (migração 0017). Sem estados: usa os salvos. Devolve null se o banco ainda não tem a
+ * migração: a tela só não mostra a conferência.
+ */
+export async function conferirPalavras(palavras: string[], ufs: string[] | null): Promise<ConferenciaPalavra[] | null> {
+  if (!palavras.length) return []
+  const { data, error } = await supabase.rpc('conferir_palavras_radar', {
+    p_empresa: empresaAtual(), p_palavras: palavras.slice(0, 40), p_ufs: ufs?.length ? ufs : null,
+  })
+  if (error) {
+    if (error.code === 'PGRST202' || /could not find the function/i.test(error.message || '')) return null
+    throw error
+  }
+  return ((data || []) as any[]).map(r => ({
+    palavra: r.palavra,
+    abertas: Number(r.abertas || 0),
+    sugestao: r.sugestao ?? null,
+    abertasSugestao: r.abertas_sugestao == null ? null : Number(r.abertas_sugestao),
+  }))
 }
 
 /** Código de 8 letras/números para mandar no Telegram: /vincular CODIGO. Vale 15 minutos. */
