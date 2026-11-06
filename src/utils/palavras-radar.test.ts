@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  adicionarPalavra, dicaDeEscrita, frasePalavra, normalizar, separarPalavras, sugerirSinonimos, trocarPalavra,
+  adicionarGrupo, adicionarPalavra, dicaDeEscrita, faltamDoGrupo, frasePalavra, GRUPOS, MAX_PALAVRAS, normalizar,
+  palavrasDeProduto, separarPalavras, sugerirSinonimos, trocarPalavra,
 } from './palavras-radar'
 
 describe('separar as palavras do campo', () => {
@@ -44,6 +45,36 @@ describe('trocar e adicionar', () => {
     expect(adicionarPalavra('remédio', 'medicamento')).toBe('remédio, medicamento')
     expect(adicionarPalavra('', 'medicamento')).toBe('medicamento')
     expect(adicionarPalavra('Medicamento', 'medicamento')).toBe('Medicamento')
+  })
+})
+
+describe('grupos prontos', () => {
+  const medicamentos = GRUPOS.find(g => g.id === 'medicamentos')!
+  it('todo grupo cabe no limite e não repete palavra', () => {
+    for (const g of GRUPOS) {
+      expect(g.palavras.length).toBeLessThanOrEqual(MAX_PALAVRAS)
+      expect(separarPalavras(g.palavras.join(','))).toEqual(g.palavras)
+    }
+  })
+  it('adiciona só o que falta, no fim', () => {
+    expect(faltamDoGrupo('dipirona, Medicamentos', medicamentos)).toEqual(['fármaco', 'médico-hospitalar'])
+    expect(adicionarGrupo('dipirona, Medicamentos', medicamentos)).toBe('dipirona, Medicamentos, fármaco, médico-hospitalar')
+    expect(adicionarGrupo('', medicamentos)).toBe('medicamento, fármaco, médico-hospitalar')
+  })
+  it('grupo completo não falta nada', () => {
+    expect(faltamDoGrupo('MEDICAMENTOS, farmacos, médico-hospitalar', medicamentos)).toEqual([])
+  })
+})
+
+describe('aviso de nome de produto', () => {
+  it('aponta palavra solta sem nenhuma aberta e sem erro de escrita', () => {
+    expect(palavrasDeProduto([
+      { palavra: 'dipirona', abertas: 0, sugestao: null, abertasSugestao: null },
+      { palavra: 'medicamento', abertas: 44, sugestao: null, abertasSugestao: null },
+      { palavra: 'limpesa', abertas: 0, sugestao: 'limpeza', abertasSugestao: 9 },
+      { palavra: 'soro fisiológico', abertas: 0, sugestao: null, abertasSugestao: null },
+      { palavra: 'Medicamentos', abertas: 0, sugestao: null, abertasSugestao: null },
+    ])).toEqual(['dipirona'])
   })
 })
 

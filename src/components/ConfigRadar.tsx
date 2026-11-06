@@ -4,7 +4,8 @@ import {
   lerFiltrosRadar, salvarFiltrosRadar, gerarCodigoTelegram, desconectarTelegram, conferirPalavras, UFS, type FiltrosRadar,
 } from '../utils/radar'
 import {
-  adicionarPalavra, frasePalavra, normalizar, separarPalavras, sugerirSinonimos, trocarPalavra, type ConferenciaPalavra,
+  adicionarGrupo, adicionarPalavra, faltamDoGrupo, frasePalavra, GRUPOS, MAX_PALAVRAS, normalizar, palavrasDeProduto,
+  separarPalavras, sugerirSinonimos, trocarPalavra, type ConferenciaPalavra, type Grupo,
 } from '../utils/palavras-radar'
 
 // Telegram e filtros do Radar da empresa. Todos veem; só o admin muda
@@ -37,6 +38,19 @@ export default function ConfigRadar({ onCarregado, onFiltrosSalvos }: Props) {
   const sinonimos = useMemo(() => sugerirSinonimos(lista), [lista])
   const porPalavra = useMemo(
     () => new Map((conferencia || []).map(c => [normalizar(c.palavra), c])), [conferencia])
+  // Palavras soltas que não acham nada e não têm erro de escrita: provavelmente nome de produto.
+  const produtos = useMemo(() => palavrasDeProduto(
+    lista.map(p => porPalavra.get(normalizar(p))).filter((c): c is ConferenciaPalavra => Boolean(c))), [lista, porPalavra])
+
+  const usarGrupo = (g: Grupo) => {
+    const novo = adicionarGrupo(palavras, g)
+    if (separarPalavras(novo).length > MAX_PALAVRAS) {
+      setErro(`Com o grupo ${g.nome} passaria de ${MAX_PALAVRAS} palavras. Tire algumas antes.`)
+      return
+    }
+    setErro('')
+    setPalavras(novo)
+  }
 
   // Espera a pessoa parar de digitar e pergunta ao banco quantas cada palavra acha nos estados marcados.
   useEffect(() => {
@@ -45,7 +59,8 @@ export default function ConfigRadar({ onCarregado, onFiltrosSalvos }: Props) {
     const t = setTimeout(() => {
       conferirPalavras(lista, ufs)
         .then(c => { if (!cancelado) setConferencia(c) })
-        .catch(() => { /* a conferência é só ajuda: se falhar, a tela continua igual */ })
+        // A conferência é só ajuda: se falhar, esconde as contas (não fica preso em "conferindo...").
+        .catch(() => { if (!cancelado) setConferencia(null) })
     }, 700)
     return () => { cancelado = true; clearTimeout(t) }
   }, [editando, lista, ufs])
@@ -205,6 +220,14 @@ export default function ConfigRadar({ onCarregado, onFiltrosSalvos }: Props) {
                   })}
                 </ul>
               ) : <p className="text-gray-600">Marque os estados para ver quantas licitações abertas cada palavra acha.</p>)}
+              {conferencia !== null && ufs.length > 0 && produtos.length > 0 && (
+                <p>
+                  <span aria-hidden="true">💡 </span>
+                  {produtos.map(p => `"${p}"`).join(', ')} não {produtos.length === 1 ? 'aparece' : 'aparecem'} no título de nenhuma licitação aberta.
+                  Os órgãos costumam escrever o grupo no título (ex.: "medicamentos") e o nome do produto só nos itens.
+                  Use um grupo pronto abaixo.
+                </p>
+              )}
               {sinonimos.length > 0 && (
                 <ul className="grid gap-1">
                   {sinonimos.map(s => (
@@ -220,6 +243,18 @@ export default function ConfigRadar({ onCarregado, onFiltrosSalvos }: Props) {
               {conferencia !== null && <p className="text-gray-600">Plural, singular, acento e maiúscula não importam: "luvas" acha "luva" e "papel" acha "papéis".</p>}
             </div>
           )}
+          <div className="grid gap-1" aria-label="Grupos prontos">
+            <p className="text-gray-600">Grupos prontos: as palavras que os órgãos usam no título das licitações.</p>
+            <div className="flex flex-wrap gap-2">
+              {GRUPOS.map(g => {
+                const faltam = faltamDoGrupo(palavras, g)
+                return faltam.length
+                  ? <button key={g.id} type="button" className="btn btn-ghost" onClick={() => usarGrupo(g)}
+                      title={`Adiciona: ${faltam.join(', ')}`} aria-label={`Adicionar o grupo ${g.nome}: ${faltam.join(', ')}`}>+ {g.nome}</button>
+                  : <span key={g.id} className="inline-flex items-center px-2 py-1 rounded border border-gray-200 text-gray-600">✓ {g.nome}</span>
+              })}
+            </div>
+          </div>
           <fieldset>
             <legend className="text-gray-600 mb-1">Estados</legend>
             <div className="flex flex-wrap gap-2">

@@ -104,6 +104,50 @@ export function adicionarPalavra(texto: string, nova: string): string {
   return separarPalavras(`${texto}\n${nova}`).join(', ')
 }
 
+/** Máximo de palavras que o banco aceita nos filtros (salvar_filtros_radar). */
+export const MAX_PALAVRAS = 40
+
+// Grupos prontos: as palavras que os órgãos usam no TÍTULO (objeto) das licitações.
+// O nome do produto (ex.: "dipirona") quase nunca está no título, só nos itens: num levantamento de
+// 600 pregões abertos no PR (nov/2026), nenhum título citava remédio pelo nome. Com este grupo de
+// Medicamentos, a amostra passou de 15 licitações (só "medicamento") para 30.
+export type Grupo = { id: string; nome: string; palavras: string[] }
+
+export const GRUPOS: Grupo[] = [
+  { id: 'medicamentos', nome: 'Medicamentos', palavras: ['medicamento', 'fármaco', 'médico-hospitalar'] },
+  { id: 'hospitalar', nome: 'Material hospitalar e odontológico', palavras: ['hospitalar', 'odontológico', 'enfermagem', 'laboratorial'] },
+  { id: 'limpeza', nome: 'Limpeza e higiene', palavras: ['limpeza', 'higiene', 'saneante', 'descartável'] },
+  { id: 'alimentacao', nome: 'Alimentação', palavras: ['gêneros alimentícios', 'alimentação escolar', 'merenda', 'hortifrutigranjeiros'] },
+  { id: 'escritorio', nome: 'Material de escritório', palavras: ['material de expediente', 'material de escritório', 'toner', 'papel A4'] },
+  { id: 'informatica', nome: 'Informática', palavras: ['informática', 'computador', 'notebook', 'impressora'] },
+  { id: 'veiculos', nome: 'Veículos e combustível', palavras: ['veículo', 'combustível', 'pneu', 'peças automotivas'] },
+]
+
+/** Palavras do grupo que ainda não estão no campo (plural e acento não contam como diferença). */
+export function faltamDoGrupo(texto: string, grupo: Grupo): string[] {
+  const tem = new Set(separarPalavras(texto).map(p => semPlural(normalizar(p))))
+  return grupo.palavras.filter(p => !tem.has(semPlural(normalizar(p))))
+}
+
+/** Acrescenta no fim do campo as palavras do grupo que faltam. */
+export function adicionarGrupo(texto: string, grupo: Grupo): string {
+  return separarPalavras([texto, ...faltamDoGrupo(texto, grupo)].join('\n')).join(', ')
+}
+
+/**
+ * Aviso quando alguma palavra solta não acha nada e não tem erro de escrita: provavelmente é nome de
+ * produto, que os órgãos não põem no título. Devolve as palavras (até 3) para citar no aviso.
+ */
+export function palavrasDeProduto(conferencia: ConferenciaPalavra[]): string[] {
+  // Palavra de grupo ("medicamento") já é o jeito do título: se não acha nada, é só falta de licitação.
+  const deGrupo = new Set(GRUPOS.flatMap(g => g.palavras).map(p => semPlural(normalizar(p))))
+  return conferencia
+    .filter(c => c.abertas === 0 && !c.sugestao && !/\s/.test(c.palavra.trim()))
+    .filter(c => !deGrupo.has(semPlural(normalizar(c.palavra))))
+    .slice(0, 3)
+    .map(c => c.palavra)
+}
+
 function vezes(n: number): string {
   return n === 1 ? '1 licitação aberta' : `${n} licitações abertas`
 }
