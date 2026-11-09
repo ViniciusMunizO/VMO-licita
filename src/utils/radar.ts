@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient'
 import { empresaAtual } from './banco'
 import type { ConferenciaPalavra } from './palavras-radar'
+import { portalDaDisputa } from './portal'
 
 // O Radar de Licitações dentro do site (migração 0014 do banco do Radar).
 // Tudo passa por funções do banco que conferem se a pessoa é da empresa:
@@ -16,6 +17,8 @@ export type LicitacaoRadar = {
   valorEstimado: number | null
   encerramento: string | null
   link: string | null
+  /** Onde é a disputa (BLL, BNC, Compras.gov.br...); null quando o PNCP não diz (aí, ver no edital). */
+  portal: string | null
   acompanhada: boolean
 }
 
@@ -43,23 +46,14 @@ export async function buscarRadar(busca: BuscaRadar = {}): Promise<{ lista: Lici
   const linhas = (data || []) as { licitacao: any; total: number; acompanhada: boolean }[]
   return {
     total: Number(linhas[0]?.total || 0),
-    lista: linhas.map(({ licitacao: l, acompanhada }) => ({
-      numeroControlePncp: l.numero_controle_pncp,
-      orgao: l.orgao,
-      municipio: l.municipio,
-      uf: l.uf,
-      modalidade: l.modalidade,
-      objeto: l.objeto,
-      valorEstimado: l.valor_estimado,
-      encerramento: l.encerramento_propostas,
-      link: l.link,
-      acompanhada,
-    })),
+    lista: linhas.map(({ licitacao, acompanhada }) => paraLicitacao(licitacao, acompanhada)),
   }
 }
 
 function paraLicitacao(l: any, acompanhada: boolean): LicitacaoRadar {
   return {
+    // publicado_por vem da busca (migração 0019 do Radar); a linha inteira da tabela traz dados.usuarioNome.
+    portal: portalDaDisputa(l.link, l.publicado_por ?? l.dados?.usuarioNome),
     numeroControlePncp: l.numero_controle_pncp,
     orgao: l.orgao,
     municipio: l.municipio,
@@ -80,6 +74,8 @@ export type BuscaConversa = {
   publicadasDesde: Date | null
   deslocamento: number
   limite: number
+  /** Qualquer ramo: ignora as palavras da empresa ("tudo de Maringá"). Migração 0019 do Radar. */
+  todas?: boolean
 }
 
 /** A busca da conversa: lugar e período livres, do mesmo jeito que o /licitacoes do bot. */
@@ -92,6 +88,8 @@ export async function buscarRadarConversa(b: BuscaConversa): Promise<{ lista: Li
     p_publicadas_desde: b.publicadasDesde?.toISOString() ?? null,
     p_limite: b.limite,
     p_deslocamento: b.deslocamento,
+    // Só vai quando pedido: a busca normal continua funcionando num banco ainda sem a 0019.
+    ...(b.todas ? { p_todas: true } : {}),
   })
   if (error) throw error
   const linhas = (data || []) as { licitacao: any; total: number; acompanhada: boolean }[]

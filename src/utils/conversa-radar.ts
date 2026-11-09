@@ -118,12 +118,21 @@ export function interpretarData(texto: string, agora: Date = new Date()): { chav
 // Onde
 // ---------------------------------------------------------------------------
 
-export type Onde =
+/** Com `todas`, mostra as licitações de qualquer ramo (sem olhar as palavras da empresa), como no bot. */
+export type Onde = (
   | { tipo: 'meus' }
   | { tipo: 'uf'; uf: string }
   | { tipo: 'regiao'; id: string }
   | { tipo: 'ufs'; ufs: string[] }
   | { tipo: 'cidade'; nome: string; uf: string }
+) & { todas?: boolean }
+
+/** O mesmo lugar, trocando entre "dos meus ramos" e "qualquer ramo". */
+export function trocarRamo(o: Onde): Onde {
+  if (!o.todas) return { ...o, todas: true }
+  const { todas: _todas, ...lugar } = o
+  return lugar as Onde
+}
 
 export type Filtro = { ufs: string[] | null; municipio: string | null; titulo: string }
 

@@ -10,7 +10,7 @@ import { listRascunhos } from '../utils/licitacoes'
 import { empresaAtual } from '../utils/banco'
 import {
   AJUDA, DICA_CIDADE, DICA_DATA, POR_PAGINA, REGIOES, UFS_LISTA, buscarCidade, entenderMensagem, filtroDoOnde,
-  foraDaColeta, linhaPrazo, resolverPeriodo, type Cidade, type Comando, type Esperando, type Onde,
+  foraDaColeta, linhaPrazo, resolverPeriodo, trocarRamo, type Cidade, type Comando, type Esperando, type Onde,
 } from '../utils/conversa-radar'
 
 // A conversa do Radar: funciona como o bot do Telegram. A pessoa toca nos botões ou escreve
@@ -170,12 +170,23 @@ export default function ChatRadar({ onAbrirFiltros, versaoFiltros }: Props) {
       [{ texto: 'Encerram em até 7 dias', acao: listar('7') }],
       [{ texto: 'Até 15 dias', acao: listar('15') }, { texto: 'Até 30 dias', acao: listar('30') }],
       [{ texto: 'Publicadas hoje', acao: listar('hoje') }, { texto: 'Até uma data', acao: { t: 'pedirData', onde } }],
+      [botaoRamo(onde)],
       [{ texto: '‹ Mudar o lugar', acao: { t: 'menuOnde' } }],
     ]
   }
 
+  // Troca entre só os ramos da empresa e qualquer ramo, no mesmo lugar. Com o período, já lista de novo.
+  function botaoRamo(onde: Onde, chave?: string): Botao {
+    const outro = trocarRamo(onde)
+    return {
+      texto: onde.todas ? '⭐ Só dos meus ramos' : '📋 Todas, de qualquer ramo',
+      acao: chave ? { t: 'listar', onde: outro, chave, desloc: 0 } : { t: 'onde', onde: outro },
+    }
+  }
+
   function mostrarMenuQuando(onde: Onde) {
-    bot(`📍 ${titulo(onde)}\n📅 Quando? Mostro as dos seus ramos, das que encerram primeiro para as que encerram depois.`, tecladoQuando(onde))
+    const oQue = onde.todas ? 'Mostro todas, de qualquer ramo,' : 'Mostro as dos seus ramos,'
+    bot(`📍 ${titulo(onde)}\n📅 Quando? ${oQue} das que encerram primeiro para as que encerram depois.`, tecladoQuando(onde))
   }
 
   async function listar(onde: Onde, chave: string, desloc: number) {
@@ -187,22 +198,28 @@ export default function ChatRadar({ onAbrirFiltros, versaoFiltros }: Props) {
     const filtro = filtroDoOnde(onde, ufsRef.current)
     const outroPeriodo: Botao = { texto: 'Outro período', acao: { t: 'onde', onde } }
     const outroLugar: Botao = { texto: 'Outro lugar', acao: { t: 'menuOnde' } }
-    const cabecalho = `📍 ${filtro.titulo} · ${periodo.titulo}`
+    const cabecalho = `📍 ${filtro.titulo} · ${periodo.titulo}${onde.todas ? ' · qualquer ramo' : ''}`
 
     const { lista, total: totalBanco } = await buscarRadarConversa({
       ufs: filtro.ufs, municipio: filtro.municipio, ate: periodo.ate, publicadasDesde: periodo.publicadasDesde,
-      deslocamento: desloc, limite: POR_PAGINA,
+      deslocamento: desloc, limite: POR_PAGINA, todas: onde.todas,
     })
     if (!lista.length) {
       setUltima({ onde, chave, proximo: null })
       if (desloc > 0) { bot('Não há mais licitações aqui.', [[outroPeriodo, outroLugar]]); return }
+      if (onde.todas) {
+        const dica = foraDaColeta(filtro, ufsRef.current) ?? 'Tente um período maior ou outro lugar.'
+        bot(`${cabecalho}\nNão achei nenhuma licitação aberta aqui.\n${dica}`, [[outroPeriodo, outroLugar]])
+        return
+      }
       // Plural e singular o banco já resolve (migração 0017). Aqui confere se alguma palavra está escrita
       // de um jeito que não aparece nas licitações ("limpesa") e sugere a parecida ("limpeza").
       const conferencia = await conferirPalavras(palavrasRef.current, filtro.ufs).catch(() => null)
       const dicaEscrita = conferencia ? dicaDeEscrita(conferencia) : null
-      const dica = (foraDaColeta(filtro, ufsRef.current) ?? 'Tente um período maior, outro lugar ou mude os filtros.') +
+      const dica = (foraDaColeta(filtro, ufsRef.current) ?? 'Tente um período maior, outro lugar, todas de qualquer ramo ou mude os filtros.') +
         (dicaEscrita ? `\n${dicaEscrita}` : '')
       bot(`${cabecalho}\nNão achei licitação de ${ramosCurtos()} aqui.\n${dica}`, [
+        [botaoRamo(onde, chave)],
         [outroPeriodo, outroLugar],
         [{ texto: '⚙️ Mudar filtros', acao: { t: 'comando', c: 'filtros' } }],
       ])
@@ -219,10 +236,13 @@ export default function ChatRadar({ onAbrirFiltros, versaoFiltros }: Props) {
     if (ate < total) {
       setUltima({ onde, chave, proximo: ate })
       const faltam = total - ate
-      bot(faltam === 1 ? 'Falta 1.' : `Faltam ${faltam}.`, [[{ texto: 'Ver mais', acao: { t: 'listar', onde, chave, desloc: ate } }]])
+      bot(faltam === 1 ? 'Falta 1.' : `Faltam ${faltam}.`, [
+        [{ texto: 'Ver mais', acao: { t: 'listar', onde, chave, desloc: ate } }],
+        [botaoRamo(onde, chave)],
+      ])
     } else {
       setUltima({ onde, chave, proximo: null })
-      bot('Isso é tudo.', [[outroPeriodo, outroLugar]])
+      bot('Isso é tudo.', [[outroPeriodo, outroLugar], [botaoRamo(onde, chave)]])
     }
   }
 
@@ -400,6 +420,7 @@ export default function ChatRadar({ onAbrirFiltros, versaoFiltros }: Props) {
         <p className="text-gray-600">📍 {local || 'Local não informado'}{l.modalidade ? ` · ${l.modalidade}` : ''}</p>
         <p className="text-gray-600">⏰ {linhaPrazo(l.encerramento)}</p>
         <p className="text-gray-600">🏛️ {l.orgao || 'Órgão não informado'}</p>
+        <p className="text-gray-600">🖥️ Portal: {l.portal || 'veja no edital'}</p>
         <div className="flex flex-wrap gap-2 items-center mt-1 pt-2 border-t border-gray-100">
           <button type="button" onClick={() => alternar(l)} disabled={ocupado === n} className={acompanhada ? 'btn btn-ghost' : 'btn btn-primary'}>
             {acompanhada ? 'Deixar de acompanhar' : '⭐ Acompanhar'}

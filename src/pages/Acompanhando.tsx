@@ -92,6 +92,7 @@ export default function Acompanhando() {
               </div>
               <p className="text-sm text-gray-600">💰 {valorBR(a.valorEstimado)}{local ? ` · 📍 ${local}` : ''}{a.modalidade ? ` · ${a.modalidade}` : ''}</p>
               <p className="text-sm text-gray-600">⏰ {linhaPrazo(a.encerramento)} · 🏛️ {a.orgao || 'Órgão não informado'}</p>
+              <p className="text-sm text-gray-600">🖥️ Portal: {a.portal || 'veja no edital'}</p>
               <div className="flex flex-wrap gap-2 items-center">
                 {a.codigo ? (
                   <Link to={`/licitacoes/${a.codigo}`} className="btn btn-primary">Abrir licitação</Link>
