@@ -204,3 +204,43 @@ export function linkPncp(numeroControlePncp: string): string | null {
   const m = numeroControlePncp.match(/^(\d+)-\d+-(\d+)\/(\d{4})$/)
   return m ? `https://pncp.gov.br/app/editais/${m[1]}/${m[3]}/${Number(m[2])}` : null
 }
+
+// Notificações da empresa (migração 0020): SE e ONDE as licitações novas e os lembretes chegam.
+// Os filtros (acima) dizem QUAIS licitações interessam; aqui é só ligar, pausar e escolher o canal.
+// O mesmo ajuste existe no bot: /notificacoes.
+export type NotificacoesRadar = {
+  avisosLigados: boolean
+  lembretesLigados: boolean
+  /** false = chegam só no sino do site, sem mensagem no Telegram. */
+  avisosNoTelegram: boolean
+  telegramConectado: boolean
+}
+
+/** null = o banco ainda não tem a migração 0020: a tela explica em vez de quebrar. */
+export async function lerNotificacoes(): Promise<NotificacoesRadar | null> {
+  const { data, error } = await supabase.rpc('notificacoes_radar', { p_empresa: empresaAtual() })
+  if (error) {
+    if (error.code === 'PGRST202' || /could not find the function/i.test(error.message || '')) return null
+    throw error
+  }
+  const n = (data || {}) as any
+  return {
+    avisosLigados: n.avisos_ligados !== false,
+    lembretesLigados: n.lembretes_ligados !== false,
+    avisosNoTelegram: n.avisos_no_telegram !== false,
+    telegramConectado: Boolean(n.telegram_conectado),
+  }
+}
+
+/** Muda só o que vier preenchido. Só o admin da empresa (o banco recusa os outros com 42501). */
+export async function salvarNotificacoes(
+  mudanca: Partial<Pick<NotificacoesRadar, 'avisosLigados' | 'lembretesLigados' | 'avisosNoTelegram'>>,
+): Promise<void> {
+  const { error } = await supabase.rpc('salvar_notificacoes_radar', {
+    p_empresa: empresaAtual(),
+    p_avisos: mudanca.avisosLigados ?? null,
+    p_lembretes: mudanca.lembretesLigados ?? null,
+    p_no_telegram: mudanca.avisosNoTelegram ?? null,
+  })
+  if (error) throw error
+}
