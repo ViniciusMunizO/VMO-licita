@@ -6,6 +6,7 @@ import { useAuth } from './context/AuthContext'
 import Logo from './components/Logo'
 import { IconLicitacoes, IconRelatorios, IconEmpresa, IconUsuarios, IconMenu, IconFechar, IconRadar, IconEstrela } from './components/NavIcons'
 import SinoAlertas from './components/SinoAlertas'
+import UsarConvite from './components/UsarConvite'
 
 // Cada página vira um chunk próprio, baixado só quando a rota é visitada —
 // sem isso, jsPDF/html2canvas/xlsx (usados só em algumas telas) entravam
@@ -22,6 +23,7 @@ const CompanyInfo = lazy(() => import('./pages/CompanyInfo'))
 const AdminAudit = lazy(() => import('./pages/AdminAudit'))
 const Radar = lazy(() => import('./pages/Radar'))
 const Acompanhando = lazy(() => import('./pages/Acompanhando'))
+const CriarConta = lazy(() => import('./pages/CriarConta'))
 
 function NavItem({ to, icon, children, onClick }: { to: string; icon: React.ReactNode; children: React.ReactNode; onClick?: () => void }) {
   return (
@@ -76,8 +78,9 @@ export default function App() {
           <p className="text-sm text-gray-500 mb-6">
             {user.empresas.length > 0
               ? 'Seu login foi criado, mas ainda não foi liberado pelo administrador da sua empresa. Fale com ele pra ativar o acesso.'
-              : `Seu login foi criado, mas ainda não está em nenhuma empresa. Peça ao administrador da sua empresa pra adicionar o e-mail ${user.email}.`}
+              : `Seu login foi criado, mas ainda não está em nenhuma empresa. Use um código de convite ou peça ao administrador da sua empresa pra adicionar o e-mail ${user.email}.`}
           </p>
+          {user.empresas.length === 0 && <UsarConvite />}
           <button onClick={sair} className="btn btn-ghost">Sair</button>
         </div>
       </div>
@@ -176,6 +179,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/redefinir-senha" element={<ResetPassword />} />
+            <Route path="/criar-conta" element={<CriarConta />} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/licitacoes" element={<ProtectedRoute><ListLicitacoes /></ProtectedRoute>} />
             <Route path="/licitacoes/novo" element={<ProtectedRoute><FormLicitacao /></ProtectedRoute>} />

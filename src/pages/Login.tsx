@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../utils/supabaseClient'
 import Logo from '../components/Logo'
@@ -226,6 +226,9 @@ export default function Login() {
             <button type="submit" disabled={loading} className="btn btn-primary w-full justify-center py-2.5 text-sm font-medium disabled:opacity-60">
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
+            <p className="text-sm text-gray-500 text-center">
+              Recebeu um código de convite? <Link to="/criar-conta" className="link-primary">Criar conta</Link>
+            </p>
           </form>
           </>
           )}
