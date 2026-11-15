@@ -85,7 +85,7 @@ export default function SinoAlertas() {
         <IconSino />
         {naoLidos > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full text-[10px] font-semibold text-white flex items-center justify-center"
-            style={{ backgroundColor: 'var(--color-accent, #dc2626)' }}>
+            style={{ backgroundColor: 'var(--color-accent-text, #0F766E)' }}>
             {naoLidos > 99 ? '99+' : naoLidos}
           </span>
         )}

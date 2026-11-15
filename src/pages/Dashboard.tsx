@@ -43,7 +43,7 @@ function StatTile({ label, value, destaque }: { label: string; value: number | s
       <div className="text-sm text-gray-500">{label}</div>
       <div
         className={destaque ? 'text-3xl font-bold mt-1' : 'text-3xl font-semibold mt-1'}
-        style={{ color: destaque ? 'var(--color-accent)' : 'var(--color-primary)' }}
+        style={{ color: destaque ? 'var(--color-accent-text)' : 'var(--color-primary)' }}
       >
         {value}
       </div>

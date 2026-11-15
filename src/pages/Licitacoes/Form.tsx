@@ -231,7 +231,7 @@ export default function FormLicitacao() {
     const texto = o.fonte === 'pncp' ? 'do PNCP, confira'
       : o.fonte === 'sugestao' ? 'sugestão pelos itens, confira'
       : `do edital${o.pagina ? `, p. ${o.pagina}` : ''}${o.confianca === 'baixa' ? ' ⚠ confira com atenção' : ', confira'}`
-    return <span className="block text-xs mt-0.5" style={{ color: 'var(--color-accent, #b45309)' }} title={o.trecho || undefined}>📄 {texto}</span>
+    return <span className="block text-xs mt-0.5" style={{ color: 'var(--color-accent-text, #0F766E)' }} title={o.trecho || undefined}>📄 {texto}</span>
   }
 
   const save = async (e: React.FormEvent) => {
@@ -499,7 +499,7 @@ export default function FormLicitacao() {
         {rascunhoId && itensEdital.length > 0 && (
           <div className="mt-6 bg-white border rounded p-4">
             <h4 className="font-semibold mb-1">{itensDoPncpValem ? 'Itens da licitação' : 'Itens do edital'} ({itensEdital.length})</h4>
-            <p className="text-xs mb-2" style={{ color: 'var(--color-accent, #b45309)' }}>{itensDoPncpValem
+            <p className="text-xs mb-2" style={{ color: 'var(--color-accent-text, #0F766E)' }}>{itensDoPncpValem
               ? '📋 Lista oficial do PNCP: número, quantidade, unidade e valor de referência. Quando a IA leu o mesmo item no edital com mais detalhe, a descrição vem do edital.'
               : '📄 Lidos do edital pela IA (o PNCP não trouxe a lista): em tabelas longas ela pode pular itens, confira com o edital.'}
             {' '}O valor de referência entra na coluna Município.</p>

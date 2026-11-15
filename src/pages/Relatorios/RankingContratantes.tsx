@@ -181,7 +181,7 @@ export default function RelatorioRankingContratantes() {
                     <td className="p-1.5 text-right">{l.ganhou}</td>
                     <td className="p-1.5 text-right">{l.perdeu}</td>
                     <td className="p-1.5 text-right">{l.taxa === null ? '-' : `${formatFixed(l.taxa, 0)}%`}</td>
-                    <td className="p-1.5 text-right font-semibold" style={{ color: 'var(--color-accent)' }}>{formatMoneyBRL(l.valorGanho)}</td>
+                    <td className="p-1.5 text-right font-semibold" style={{ color: 'var(--color-accent-text)' }}>{formatMoneyBRL(l.valorGanho)}</td>
                   </tr>
                 ))}
                 <tr className="border-t bg-gray-50 font-semibold">

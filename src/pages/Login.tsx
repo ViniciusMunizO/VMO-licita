@@ -71,7 +71,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen grid md:grid-cols-2">
-      <div className="hidden md:flex flex-col justify-between p-12 text-white relative overflow-hidden" style={{ background: 'linear-gradient(155deg, var(--color-primary), var(--color-secondary))' }}>
+      <div className="hidden md:flex flex-col justify-between p-12 text-white relative overflow-hidden" style={{ background: 'linear-gradient(155deg, var(--color-primary), var(--color-primary-hover))' }}>
         <div
           className="absolute inset-0 opacity-[0.07] pointer-events-none"
           style={{ backgroundImage: 'radial-gradient(circle, #fff 1.5px, transparent 1.5px)', backgroundSize: '28px 28px' }}

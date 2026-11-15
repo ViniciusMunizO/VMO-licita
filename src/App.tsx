@@ -94,7 +94,7 @@ export default function App() {
         <nav className="bg-white shadow-sm sticky top-0 z-20">
           <div
             className="h-[3px] w-full"
-            style={{ background: 'linear-gradient(90deg, var(--color-primary), var(--color-accent), var(--color-accent-claro))' }}
+            style={{ background: 'linear-gradient(90deg, var(--color-primary), var(--color-accent), var(--color-secondary))' }}
           />
           <div className="container-fixed flex items-center justify-between gap-3 py-3">
             <div className="flex items-center gap-6 flex-shrink-0">

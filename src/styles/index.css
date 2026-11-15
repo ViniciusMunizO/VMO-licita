@@ -7,15 +7,21 @@ html, body, #root {
 }
 
 :root {
-  /* Identidade visual do sistema (VMO Sistemas), tirada da própria logo.
-     `primary` é o escuro do "VMO" e `accent` o turquesa do pentágono; os dois
-     saem direto da imagem. `secondary` é o tom no meio do caminho entre eles,
-     usado em hover e no degradê do login — escuro o bastante pra manter texto
-     branco legível em cima, o que o turquesa puro não garantiria. */
-  --color-primary: #0d2b30;
-  --color-secondary: #106069;
-  --color-accent: #1396a3;
-  --color-accent-claro: #35d0d3;
+  /* Paleta do sistema escolhida pelo CEO em 15/11/2026. */
+  --color-primary: #0B3D3B;    /* botões, links, títulos de destaque */
+  --color-accent: #14B8A6;     /* barras, bordas, bolinhas e ícones (NÃO texto) */
+  --color-secondary: #99F6E4;  /* menta claro: realces e fim de degradê */
+  --color-surface: #E6FFFB;    /* caixinhas de fundo (avisos, código gerado) */
+  --color-background: #F8FFFE; /* fundo das páginas */
+
+  /* Dois tons de apoio, da mesma família, para manter a leitura:
+     - o `secondary` é claro demais para ficar atrás de texto branco, então o
+       hover dos botões e o degradê do login usam `primary-hover`;
+     - o `accent` puro dá só ~2,5:1 de contraste como texto em fundo branco
+       (o mínimo é 4,5:1), então número e texto "em destaque" usam `accent-text`. */
+  --color-primary-hover: #115E59;
+  --color-accent-text: #0F766E;
+  --color-bg-subtle: var(--color-surface);
 
   /* Vermelho por significado (erro, perigo, desclassificação), não por marca —
      por isso não muda quando a identidade visual do sistema muda. */
@@ -30,7 +36,8 @@ html, body, #root {
 /* Base typography and layout polish */
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-800 antialiased;
+    @apply text-gray-800 antialiased;
+    background-color: var(--color-background);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   }
   h1, h2, h3, h4, h5 { @apply text-gray-900; }
@@ -62,18 +69,18 @@ html, body, #root {
 
   .btn { @apply inline-flex items-center gap-2 px-3 py-1 rounded shadow-sm text-sm; }
   .btn-primary { @apply btn text-white; background-color: var(--color-primary); }
-  .btn-primary:hover { background-color: var(--color-secondary); }
+  .btn-primary:hover { background-color: var(--color-primary-hover); }
   .btn-ghost { @apply btn bg-gray-100 text-gray-800 hover:bg-gray-200; }
 
   /* Brand link styles */
   .brand { color: var(--color-primary); font-weight: 700; }
   .nav-link { color: rgba(55,65,81,1); }
-  .nav-link:hover { color: var(--color-secondary); }
+  .nav-link:hover { color: var(--color-primary-hover); }
 
   .link-primary { color: var(--color-primary); }
-  .link-primary:hover { color: var(--color-secondary); }
+  .link-primary:hover { color: var(--color-primary-hover); }
 
-  .link-secondary { color: var(--color-secondary); }
+  .link-secondary { color: var(--color-primary-hover); }
   .link-secondary:hover { color: var(--color-primary); }
 
   input, input[type="text"], input[type="number"], input[type="datetime-local"], select, textarea {
@@ -98,7 +105,7 @@ html, body, #root {
     outline: none;
     border-color: var(--color-primary);
     /* halo do foco na cor de acento, pra combinar com a borda */
-    box-shadow: 0 6px 18px rgba(19,150,163,0.15);
+    box-shadow: 0 6px 18px rgba(20,184,166,0.18);
   }
 }
 
