@@ -31,7 +31,7 @@ function NavItem({ to, icon, children, onClick }: { to: string; icon: React.Reac
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex items-center gap-2 px-3 py-2.5 lg:py-2 rounded-lg text-sm font-medium transition-colors ${
+        `flex items-center gap-2 px-3 py-2.5 lg:py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
           isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
         }`
       }
@@ -54,9 +54,10 @@ export default function App() {
   const empresasLiberadas = (user?.empresas || []).filter(e => e.ativo)
   const nav = useNavigate()
   const location = useLocation()
-  // Abaixo de `lg` os itens viram gaveta. O corte é em `lg` e não em `md`
-  // porque "Informações da Empresa" é um rótulo longo: com os quatro itens,
-  // a logo e o nome do usuário, a barra só cabe inteira a partir de ~1024px.
+  // Abaixo de `lg` os itens viram gaveta. Na barra de cima o admin vê seis itens,
+  // então: o rótulo da empresa é curto ("Empresa"), os itens nunca encolhem e
+  // quem cede espaço é o lado direito (nome da empresa só a partir de `xl`,
+  // nome da pessoa só a partir de `2xl`). Assim nada fica por cima de nada.
   const [menuAberto, setMenuAberto] = useState(false)
 
   // Navegou: fecha a gaveta. Sem isto ela fica aberta por cima da tela nova.
@@ -96,7 +97,7 @@ export default function App() {
             style={{ background: 'linear-gradient(90deg, var(--color-primary), var(--color-accent), var(--color-accent-claro))' }}
           />
           <div className="container-fixed flex items-center justify-between gap-3 py-3">
-            <div className="flex items-center gap-8 min-w-0">
+            <div className="flex items-center gap-6 flex-shrink-0">
               <Link to="/" className="flex items-center flex-shrink-0">
                 <Logo size="md" />
               </Link>
@@ -106,7 +107,7 @@ export default function App() {
                 <NavItem to="/acompanhando" icon={<IconEstrela />}>Acompanhando</NavItem>
                 <NavItem to="/relatorios" icon={<IconRelatorios />}>Relatórios</NavItem>
                 {user?.role === 'admin' && (
-                  <NavItem to="/empresa" icon={<IconEmpresa />}>Informações da Empresa</NavItem>
+                  <NavItem to="/empresa" icon={<IconEmpresa />}>Empresa</NavItem>
                 )}
                 {(user?.role === 'admin' || user?.role === 'moderador') && (
                   <NavItem to="/users" icon={<IconUsuarios />}>Usuários</NavItem>
@@ -120,12 +121,12 @@ export default function App() {
                   aria-label="Empresa aberta"
                   value={user.empresaId || ''}
                   onChange={e => trocarEmpresa(e.target.value)}
-                  className="text-sm p-1.5 rounded max-w-[12rem] truncate"
+                  className="text-sm p-1.5 rounded min-w-0 max-w-[9rem] xl:max-w-[12rem] truncate"
                 >
                   {empresasLiberadas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
                 </select>
               ) : user.empresaNome ? (
-                <span className="text-sm font-medium text-gray-700 hidden md:inline truncate max-w-[14rem]">{user.empresaNome}</span>
+                <span className="text-sm font-medium text-gray-700 hidden xl:inline min-w-0 truncate max-w-[14rem]">{user.empresaNome}</span>
               ) : null}
               {user.empresaId && <SinoAlertas />}
               <div className="flex items-center gap-2.5 min-w-0">
@@ -137,7 +138,7 @@ export default function App() {
                 </div>
                 {/* O nome é a primeira coisa a sair quando falta espaço: a
                     inicial no avatar já identifica quem está logado. */}
-                <span className="text-sm text-gray-600 hidden xl:inline truncate">{user?.name}</span>
+                <span className="text-sm text-gray-600 hidden 2xl:inline truncate">{user?.name}</span>
               </div>
               <button onClick={sair} className="btn btn-ghost hidden lg:inline-flex">Sair</button>
               <button
